@@ -169,7 +169,7 @@ while [[ $# -gt 0 ]]; do
 		--nevents)
 			NEVENTS="${2}"
 			shift 2;;
-		
+
 		--) shift; break;;
 		*) break ;;
     esac
@@ -231,7 +231,7 @@ function run_parallel() {
 	fi
 
 	comm+="$@"
-	
+
 	[[ ${DRYRUN} -eq 1 ]] && echo ${comm} || ${comm}
 }
 

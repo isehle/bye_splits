@@ -20,7 +20,7 @@ def valid1(energies, infile, outfile, nbinsRz, nbinsPhi):
     """
     with open(infile, 'w') as flocal, open(outfile, 'r') as fremote :
         lines = fremote.readlines()
-         
+
         for line in lines:
             l = line.split('\t')
             if l[0]=='\n' or '#' in l[0]:
@@ -34,7 +34,7 @@ def valid1(energies, infile, outfile, nbinsRz, nbinsPhi):
         for bin1 in range(nbinsRz):
             for bin2 in range(nbinsPhi):
                 flocal.write('{}\t{}\t{}\n'.format(bin1, bin2, np.around(energies[bin1,bin2], 6)))
-                
+
 
 def smoothAlongRz(arr, nbinsRz, nbinsPhi):
     """

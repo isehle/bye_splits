@@ -21,7 +21,7 @@ def validation(mipPts, event, infile, outfile, nbinsrz, nbinsphi):
     """Compares all values of 2d histogram between local and CMSSW versions."""
     with open(infile, 'w') as flocal, open(outfile, 'r') as fremote:
         lines = fremote.readlines()
-         
+
         for line in lines:
             l = line.split('\t')
             if l[0]=='\n' or '#' in l[0]:

@@ -17,6 +17,24 @@ import yaml
 import numpy as np
 import pandas as pd
 import h5py
+import itertools
+
+def deltar(dfgen, dfout):
+    diff = pd.DataFrame({'deta': dfout['etanew']-dfgen['genpart_exeta'],
+                         'dphi': np.abs(dfout['phinew']-dfgen['genpart_exphi'])})
+
+    sel=diff['dphi']>np.pi
+    diff['dphi']-=sel*(2*np.pi)
+
+    return(np.sqrt(diff['dphi']*diff['dphi']+diff['deta']*diff['deta']))
+
+def matching(event):
+    if event.matches.sum()==0:
+        return event.cl3d_pt==event.cl3d_pt.max()
+    else:
+        cond_a = event.matches==True
+        cond_b = event.cl3d_pt==event[cond_a].cl3d_pt.max()
+        return (cond_a&cond_b)
 
 with open(params.CfgPath, 'r') as afile:
         cfg = yaml.safe_load(afile)
