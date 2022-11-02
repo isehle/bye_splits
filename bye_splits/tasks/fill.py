@@ -133,6 +133,7 @@ def fill(pars, df_gen, df_cl, df_tc, **kw):
 if __name__ == "__main__":
     import argparse
     from bye_splits.utils import params, parsing
+    from bye_splits import iterative_optimization as itopt
 
     parser = argparse.ArgumentParser(description='Filling standalone step.')
     parsing.add_parameters(parser)
