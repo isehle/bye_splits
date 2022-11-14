@@ -17,6 +17,9 @@ import pandas as pd
 import re
 
 
+import re
+from copy import deepcopy
+
 def binConv(vals, dist, amin):
     """
     Converts bin indexes back to values (central values in the bin).
