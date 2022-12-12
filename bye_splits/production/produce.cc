@@ -178,6 +178,5 @@ int main(int argc, char **argv)
   }
 
   file.close();
-
   return 0;
 }

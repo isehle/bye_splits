@@ -112,6 +112,7 @@ void skim(std::string tn, std::string inf, std::string outf, std::string particl
           {"electrons", "11"},
           {"pions", "211"}};
   std::string condgen = "genpart_gen != -1 && ";
+
   condgen += "genpart_reachedEE == " + reachedEE;
   condgen += " && genpart_pid == abs(" + pmap[particle] + ")";
   condgen += " && genpart_exeta > 0";
@@ -247,4 +248,5 @@ void skim(std::string tn, std::string inf, std::string outf, std::string particl
   // display event processing progress
   ROOT::RDF::RResultPtr<long long unsigned> count = addProgressBar(ROOT::RDF::RNode(dd2));
   count.GetValue();
+
 }
