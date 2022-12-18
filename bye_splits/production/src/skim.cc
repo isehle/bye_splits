@@ -119,6 +119,11 @@ void skim(std::string tn, std::string inf, std::string outf, std::string particl
 
   auto df = dataframe.Define(vtmp + "_gens", condgen);
   for (auto &v : gen_v)
+
+  auto dd = df.Define("good_gens", condgen);
+  
+  // This produces an error: the second expression needs to be a C++ function, written as a string, to be used with RDataFrame's .Define() method.
+  for(auto& v : genvars)
   {
     df = df.Define(vtmp + "_" + v, v + "[" + vtmp + "_gens]");
   }
@@ -190,6 +195,23 @@ void skim(std::string tn, std::string inf, std::string outf, std::string particl
   }
   std::vector<std::string> uintv = join_vars(cl_uintv, tc_uintv);
   for (auto &var : uintv)
+  
+  vector<string> tcvars = {
+	"tc_energy", "tc_mipPt", "tc_pt", "tc_layer",
+	"tc_x", "tc_y", "tc_z", "tc_phi", "tc_eta",
+	"tc_cellu", "tc_cellv", "tc_waferu", "tc_waferv",
+  };
+	dd = dd.Define("good_" + var,
+				   [](const ROOT::VecOps::RVec<float> &v) {
+					 return std::vector<float>(v.begin(), v.end());
+				   },
+				   {"tmp_good_" + var});
+  }
+
+  vector<string> allvars = join_vars(genvars, tcvars, clvars);
+  vector<string> good_allvars = {"event"};
+<<<<<<< HEAD
+>>>>>>> change type to std vectors
   {
     dd2 = dd2.Define("good_" + var,
                      [](const ROOT::VecOps::RVec<unsigned> &v)
