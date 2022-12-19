@@ -3,7 +3,6 @@
 #include <tuple>
 #include "include/skim.h"
 
-#include <stdio.h>  // for printf()
 #include <stdlib.h> // for strtol()
 #include <errno.h>  // for errno
 #include <limits.h> // for INT_MIN and INT_MAX
@@ -178,6 +177,5 @@ int main(int argc, char **argv)
   }
 
   file.close();
-
   return 0;
 }
