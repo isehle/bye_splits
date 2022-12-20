@@ -44,7 +44,11 @@ class EventData(BaseData):
 
     def cache_events(self, events):
         """Read dataset from parquet to cache"""
+<<<<<<< HEAD
         if not os.path.exists(self.outpath) or self.reprocess:
+=======
+        if not os.path.exists(self.outpath):
+>>>>>>> :construction: geometry added; refletion issue to be solved
             self.store()
         events = self._convert_to_list(events)
 
@@ -63,6 +67,7 @@ class EventData(BaseData):
 
         # self.cache = self.cache.persist() only for dask dataframes
 
+<<<<<<< HEAD
     def _convert_to_list(self, events):
         """Converts a variable to a list"""
         ret = events
@@ -96,6 +101,9 @@ class EventData(BaseData):
 
     def provide(self):
         print("Providing event {} data...".format(self.tag))
+=======
+    def provide(self):
+>>>>>>> :construction: geometry added; refletion issue to be solved
         if not os.path.exists(self.outpath):
             self.store()
         return ak.from_parquet(self.outpath)
@@ -168,6 +176,9 @@ class EventData(BaseData):
     def store(self):
         print("Store event {} data...".format(self.tag))
         data = self.select()
+<<<<<<< HEAD
         if os.path.exists(self.outpath):
             os.remove(self.outpath)
+=======
+>>>>>>> :construction: geometry added; refletion issue to be solved
         ak.to_parquet(data, self.outpath)

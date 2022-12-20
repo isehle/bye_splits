@@ -210,8 +210,7 @@ void skim(std::string tn, std::string inf, std::string outf, std::string particl
 
   vector<string> allvars = join_vars(genvars, tcvars, clvars);
   vector<string> good_allvars = {"event"};
-<<<<<<< HEAD
->>>>>>> change type to std vectors
+
   {
     dd2 = dd2.Define("good_" + var,
                      [](const ROOT::VecOps::RVec<unsigned> &v)
