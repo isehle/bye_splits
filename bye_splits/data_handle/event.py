@@ -20,6 +20,7 @@ from utils import params
 from data_handle.base import BaseData
 
 class EventData(BaseData):
+<<<<<<< HEAD
     def __init__(self, indata, tag="v0", default_events=[], reprocess=False,
                  logger=None, is_tc=True, set_default_events=False):
         super().__init__(tag, reprocess, logger, is_tc)
@@ -49,6 +50,22 @@ class EventData(BaseData):
 =======
         if not os.path.exists(self.outpath):
 >>>>>>> :construction: geometry added; refletion issue to be solved
+=======
+    def __init__(self, inname='', tag='v0', default_events=[], reprocess=False):
+        super().__init__(inname, tag, reprocess)
+        
+        with open(params.viz_kw['CfgEventPath'], 'r') as afile:
+            cfg = yaml.safe_load(afile)
+            self.var = cfg['varEvents']
+            
+        self.cache = None
+        self.events = default_events
+        self.cache_events(self.events)
+
+    def cache_events(self, events):
+        """Read dataset from parquet to cache"""
+        if not os.path.exists(self.outpath) or self.reprocess:
+>>>>>>> :construction: debug and add orient and part
             self.store()
         events = self._convert_to_list(events)
 
@@ -100,10 +117,14 @@ class EventData(BaseData):
         return ds.event.tolist()
 
     def provide(self):
+<<<<<<< HEAD
         print("Providing event {} data...".format(self.tag))
 =======
     def provide(self):
 >>>>>>> :construction: geometry added; refletion issue to be solved
+=======
+        print('Providing event {} data...'.format(self.tag))
+>>>>>>> :construction: debug and add orient and part
         if not os.path.exists(self.outpath):
             self.store()
         return ak.from_parquet(self.outpath)
@@ -163,22 +184,43 @@ class EventData(BaseData):
         return self.provide_events(events), events
 
     def select(self):
+<<<<<<< HEAD
         with up.open(self.indata.path, array_cache="550 MB", num_workers=8) as f:
             tree = f[self.indata.tree_path]
             allvars = set([y for x in self.var.values() for y in x.values()])
             data = tree.arrays(filter_name="/" + "|".join(allvars) + "/", library="ak")
             pass
+=======
+        adir = 'FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple'
+        atree = 'HGCalTriggerNtuple'
+
+        with up.open(str(self.inpath), array_cache='550 MB', num_workers=8) as f:
+            # print(tree.show())
+            tree = f[adir + '/' + atree]
+            data = tree.arrays(filter_name='/' + '|'.join(self.var.values()) + '/',
+                               library='ak',
+                               #entry_stop=50, debug
+                               )
+>>>>>>> :construction: debug and add orient and part
         # data[self.var.v] = data.waferv
         # data[self.newvar.vs] = -1 * data.waferv
         # data[self.newvar.c] = "#8a2be2"
         return data
 
     def store(self):
+<<<<<<< HEAD
         print("Store event {} data...".format(self.tag))
+=======
+        print('Store event {} data...'.format(self.tag))
+>>>>>>> :construction: debug and add orient and part
         data = self.select()
 <<<<<<< HEAD
         if os.path.exists(self.outpath):
+<<<<<<< HEAD
             os.remove(self.outpath)
 =======
 >>>>>>> :construction: geometry added; refletion issue to be solved
+=======
+            shutil.rmtree(self.outpath)
+>>>>>>> :construction: debug and add orient and part
         ak.to_parquet(data, self.outpath)

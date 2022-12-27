@@ -117,12 +117,20 @@ void skim(std::string tn, std::string inf, std::string outf, std::string particl
   condgen += " && genpart_pid == abs(" + pmap[particle] + ")";
   condgen += " && genpart_exeta > 0";
 
+<<<<<<< HEAD
   auto df = dataframe.Define(vtmp + "_gens", condgen);
   for (auto &v : gen_v)
 
+=======
+<<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> :construction: debug and add orient and part
   auto dd = df.Define("good_gens", condgen);
   
   // This produces an error: the second expression needs to be a C++ function, written as a string, to be used with RDataFrame's .Define() method.
+=======
+  dd = dd.Define("tmp_good_gens", condgen);
+>>>>>>> :construction: debug and add orient and part
   for(auto& v : genvars)
   {
     df = df.Define(vtmp + "_" + v, v + "[" + vtmp + "_gens]");

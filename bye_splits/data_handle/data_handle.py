@@ -21,7 +21,8 @@ class EventDataParticle:
         with open(params.viz_kw['CfgEventPath'], 'r') as afile:
             self.config = yaml.safe_load(afile)
 
-        in_name = '_'.join(('skim', self.particles, '0PU_bc_stc_hadd.root'))    
+        data_suffix = 'skim' + ('_small' if debug else '')
+        in_name = '_'.join((data_suffix, self.particles, '0PU_bc_stc_hadd.root'))
         default_events = self.config['defaultEvents'][self.particles]
         self.data = EventData(in_name, self.tag, default_events)
 
