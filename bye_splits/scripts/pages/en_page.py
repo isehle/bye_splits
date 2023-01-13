@@ -4,31 +4,19 @@ import sys
 parent_dir = os.path.abspath(__file__ + 4 * '/..')
 sys.path.insert(0, parent_dir)
 
-import bye_splits
-from bye_splits import utils
-from bye_splits import tasks
 from bye_splits.utils import common
-from bye_splits.tasks import cluster
-from bye_splits.tasks import cluster_test
 
 import re
 import numpy as np
 import pandas as pd
-import h5py
 
-import math
-import itertools
-
-from dash import Dash, dcc, html, Input, Output, callback
+from dash import dcc, html, Input, Output, callback
 import dash
-import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 import argparse
 from bye_splits.utils import params, parsing
-import matplotlib.pyplot as plt
-from matplotlib import cm
 
 parser = argparse.ArgumentParser(description='Clustering standalone step.')
 parsing.add_parameters(parser)
@@ -39,8 +27,6 @@ FLAGS.reg = 'All'
 FLAGS.sel = 'below_eta_2.7'
 
 input_files = params.fill_kw['FillInFiles']
-
-# THIS FILE IS A WORK IN PROGRESS
 
 dash.register_page(__name__, title='Energy', name='Energy')
 
@@ -64,6 +50,15 @@ layout = html.Div([
     Input("eta_range", "value"))
 
 def plot_norm(normby, eta_range, pars=vars(FLAGS), init_files=input_files):
+    global y_axis_title
+
+    if normby=='Energy':
+        y_axis_title = r'$\frac{\bar{E_{Cl}}}{\bar{E}_{Gen}}$'
+    elif normby=='PT':
+        y_axis_title = r'$\frac{\bar{p_T}^{Cl}}{\bar{p_T}^{Gen}}$'
+    else:
+        y_axis_title = r'$\frac{E_{Cl}}{E_{Max}}$'
+
     plot_dict = {}
     normed_energies = dict.fromkeys(init_files.keys(),[0.0]) # Initialize at 0 since we only consider coefs[1:] (coefs[0] is an empty dataframe)
     start = params.energy_kw['EnergyOut']
@@ -123,14 +118,8 @@ def plot_norm(normby, eta_range, pars=vars(FLAGS), init_files=input_files):
     start, end, tot = params.energy_kw['Coeffs']
     coefs = np.linspace(start, end, tot)
 
-    one_line = np.full(tot,1.0)
-
-    coef_ticks = coefs[0::5]
-
     coef_labels = [round(coef,3) for coef in coefs]
     coef_labels= coef_labels[0::5]
-
-    color_list = cm.rainbow(np.linspace(0,1,len(normed_energies)))
 
     fig = make_subplots(rows=1, cols=2, subplot_titles=("Photon", "Pion"))
 
@@ -144,6 +133,6 @@ def plot_norm(normby, eta_range, pars=vars(FLAGS), init_files=input_files):
 
     fig.update_xaxes(title_text='Radius (Coeff)')
 
-    fig.update_layout(title_text='Normalized Energy Distribution', yaxis_title_text=r'$\frac{\bar{E_{Cl}}}{\bar{E}_{Gen}}$')
+    fig.update_layout(title_text='Normalized Energy Distribution', yaxis_title_text=y_axis_title)
 
     return fig
