@@ -1,22 +1,32 @@
 import os
 import sys
-from threading import Timer
-from dash import Dash, dcc, html, Input, Output, callback, dash_table
+from dash import dcc, html, Input, Output, callback
 import dash
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 import numpy as np
 import re
 import pandas as pd
-import webbrowser
 
 parent_dir = os.path.abspath(__file__ + 4 * '/..')
 sys.path.insert(0, parent_dir)
 
-from bye_splits.utils import params, common
+import argparse
+from bye_splits.utils import params, parsing, common
 
+# Set up to work with the rest of the files in the pipeline
+parser = argparse.ArgumentParser(description='Clustering standalone step.')
+parsing.add_parameters(parser)
+FLAGS = parser.parse_args()
+assert FLAGS.sel in ('splits_only',) or FLAGS.sel.startswith('above_eta_') or FLAGS.sel.startswith('below_eta_')
+
+FLAGS.reg = 'All'
+FLAGS.sel = 'below_eta_2.7'
+
+input_files = params.fill_kw['FillInFiles']
+
+# Find the element of a list containing strings ['coef_{float_1}', 'coef_{float_2}', ...] which is closest to some float_i
 def_k = 0.0
-
 def closest(list, k=def_k):
     try:
         list = np.reshape(np.asarray(list), 1)
@@ -40,10 +50,41 @@ def effrms(data, c=0.68):
 
     return out
 
-phot_file = 'data/PU0/energy_out_ThresholdDummyHistomaxnoareath20_photon_0PU_truncation_hadd_with_pt_PAR_0p5_SEL_below_eta_2p7_REG_All_SW_1_SK_default_CA_min_distance.hdf5'
-pion_file1 = 'data/PU0/energy_out_ThresholdDummyHistomaxnoareath20_ntuple_1_with_pt_PAR_0p5_SEL_below_eta_2p7_REG_All_SW_1_SK_default_CA_min_distance.hdf5'
-pion_file2 = 'data/PU0/energy_out_ThresholdDummyHistomaxnoareath20_ntuple_2_with_pt_PAR_0p5_SEL_below_eta_2p7_REG_All_SW_1_SK_default_CA_min_distance.hdf5'
-pion_file3 = 'data/PU0/energy_out_ThresholdDummyHistomaxnoareath20_ntuple_3_with_pt_PAR_0p5_SEL_below_eta_2p7_REG_All_SW_1_SK_default_CA_min_distance.hdf5'
+def get_str(coef, file):
+    coef_str = 'coef_{}'.format(str(coef).replace('.','p'))
+    if coef_str not in file.keys():
+        coef_list = [float(re.split('coef_',key)[1].replace('p','.')) for key in file.keys()]
+        new_coef = closest(coef_list, coef)
+        coef_str = 'coef_{}'.format(str(new_coef).replace('.','p'))
+    return coef_str
+
+def get_dfs(init_files, coef, pars):
+
+    file_dict = {}
+    start = params.energy_kw['EnergyOut']
+    df_dict = dict.fromkeys(init_files.keys(),[0.0])
+
+    for key in init_files.keys():
+        file_dict[key] = [start+re.split('gen_cl3d_tc',file)[1] for file in init_files[key]]
+        file_dict[key] = [common.fill_path(file,**pars) for file in file_dict[key]]
+        if len(file_dict[key])==1:
+
+            File = pd.HDFStore(file_dict[key][0],'r')
+            
+            coef_str = get_str(coef, File)
+            
+            df = File[coef_str]
+        else:
+            file_list = [pd.HDFStore(val,'r') for val in file_dict[key]]
+            coef_str = get_str(coef, file_list[0])
+            df_list = [file_list[i][coef_str] for i in range(len(file_list))]
+            df = pd.concat(df_list)
+        df_dict[key] = df
+    
+    return df_dict
+
+# Dash page setup
+##############################################################################################################################
 
 marks = {coef : {"label" : format(coef,'.3f'), "style": {"transform": "rotate(-90deg)"}} for coef in np.arange(0.0,0.05,0.001)}
 
@@ -77,80 +118,66 @@ layout = dbc.Container([
     Input("coef", "value"),
     Input("eta_range", "value"))
 
+##############################################################################################################################
+
 def display_color(coef, eta_range):
-    with pd.HDFStore(phot_file,'r') as Phot, pd.HDFStore(pion_file1,'r') as Pi1, pd.HDFStore(pion_file2,'r') as Pi2, pd.HDFStore(pion_file3,'r') as Pi3:
+    dfs_by_particle = get_dfs(input_files, coef, vars(FLAGS))
+    phot_df = dfs_by_particle['photon']
+    pion_df = dfs_by_particle['pion']
 
-        #coefs = np.linspace(0.0,0.05,50)[1:]
-        coefs = np.linspace(0.0,0.05,50)
+    phot_df['normed_energies'] = phot_df['en']/phot_df['genpart_energy']
+    pion_df['normed_energies'] = pion_df['en']/pion_df['genpart_energy']
 
-        coef_str = 'coef_{}'.format(str(coef).replace('.','p'))
+    phot_df = phot_df[ phot_df['genpart_exeta'] > eta_range[0] ]
+    pion_df = pion_df[ pion_df['genpart_exeta'] > eta_range[0] ]
 
-        if coef_str not in Phot.keys():
-            coef_list = [float(re.split('coef_',key)[1].replace('p','.')) for key in Phot.keys()]
-            new_coef = closest(coef_list, coef)
-            coef_str = 'coef_{}'.format(str(new_coef).replace('.','p'))
+    phot_df = phot_df[ phot_df['genpart_exeta'] < eta_range[1] ]
+    pion_df = pion_df[ pion_df['genpart_exeta'] < eta_range[1] ]
 
-        phot_df = Phot[coef_str]
-        pion_df = pd.concat([Pi1[coef_str],Pi2[coef_str],Pi3[coef_str]])
+    phot_mean_en = phot_df['normed_energies'].mean()
+    pion_mean_en = pion_df['normed_energies'].mean()
 
-        phot_df['normed_energies'] = phot_df['en']/phot_df['genpart_energy']
-        pion_df['normed_energies'] = pion_df['en']/pion_df['genpart_energy']
+    phot_rms = phot_df['normed_energies'].std()/phot_mean_en
+    phot_eff_rms = effrms(phot_df['normed_energies'])/phot_mean_en
+    phot_gaus_diff = np.abs(phot_eff_rms-phot_rms)/phot_rms
 
-        phot_df = phot_df[ phot_df['genpart_exeta'] > eta_range[0] ]
-        pion_df = pion_df[ pion_df['genpart_exeta'] > eta_range[0] ]
+    pion_rms = pion_df['normed_energies'].std()/pion_mean_en
+    pion_eff_rms = effrms(pion_df['normed_energies'])/pion_mean_en
+    pion_gaus_diff = np.abs(pion_eff_rms-pion_rms)/pion_rms
 
-        phot_df = phot_df[ phot_df['genpart_exeta'] < eta_range[1] ]
-        pion_df = pion_df[ pion_df['genpart_exeta'] < eta_range[1] ]
+    pion_gaus_str = format(pion_gaus_diff[0], '.3f')
+    phot_gaus_str = format(phot_gaus_diff[0], '.3f')
 
-        phot_min_eta = phot_df['genpart_exeta'].min()
-        phot_max_eta = phot_df['genpart_exeta'].max()
+    pion_rms_str = format(pion_rms, '.3f')
+    phot_rms_str = format(phot_rms, '.3f')
 
-        pion_min_eta = pion_df['genpart_exeta'].min()
-        pion_max_eta = pion_df['genpart_exeta'].max()
+    pion_eff_rms_str = format(pion_eff_rms[0], '.3f')
+    phot_eff_rms_str = format(phot_eff_rms[0], '.3f')
 
-        phot_mean_en = phot_df['normed_energies'].mean()
-        pion_mean_en = pion_df['normed_energies'].mean()
+    fig = go.Figure()
 
-        phot_rms = phot_df['normed_energies'].std()/phot_mean_en
-        phot_eff_rms = effrms(phot_df['normed_energies'])/phot_mean_en
-        phot_gaus_diff = np.abs(phot_eff_rms-phot_rms)/phot_rms
+    fig.add_trace(go.Histogram(x=pion_df['normed_energies'], nbinsx=100, autobinx=False, name='Pion'))
+    fig.add_trace(go.Histogram(x=phot_df['normed_energies'], nbinsx=100, autobinx=False, name='Photon'))
 
-        pion_rms = pion_df['normed_energies'].std()/pion_mean_en
-        pion_eff_rms = effrms(pion_df['normed_energies'])/pion_mean_en
-        pion_gaus_diff = np.abs(pion_eff_rms-pion_rms)/pion_rms
+    fig.update_layout(barmode='overlay',title_text='Normalized Cluster Energy', xaxis_title=r'$\Huge{\frac{E_{Cl}}{E_{Gen}}}$', yaxis_title_text=r'$\Large{Events}$')
 
-        pion_gaus_str = format(pion_gaus_diff[0], '.3f')
-        phot_gaus_str = format(phot_gaus_diff[0], '.3f')
+    fig.update_traces(opacity=0.5)
 
-        pion_rms_str = format(pion_rms, '.3f')
-        phot_rms_str = format(phot_rms, '.3f')
-
-        pion_eff_rms_str = format(pion_eff_rms[0], '.3f')
-        phot_eff_rms_str = format(phot_eff_rms[0], '.3f')
-
-        fig = go.Figure()
-
-        fig.add_trace(go.Histogram(x=pion_df['normed_energies'], nbinsx=100, autobinx=False, name='Pion'))
-        fig.add_trace(go.Histogram(x=phot_df['normed_energies'], nbinsx=100, autobinx=False, name='Photon'))
-
-        fig.update_layout(barmode='overlay',title_text='Normalized Cluster Energy', xaxis_title=r'$\Huge{\frac{E_{Cl}}{E_{Gen}}}$', yaxis_title_text=r'$\Large{Events}$')
-
-        fig.update_traces(opacity=0.5)
-
-        my_vals = {
-            'Photon': {
-                'RMS': phot_rms_str,
-                'Effective RMS': phot_eff_rms_str,
-                'Gaussianity': phot_gaus_str,
-            },
-            'Pion': {
-                'RMS': pion_rms_str,
-                'Effective RMS': pion_eff_rms_str,
-                'Gaussianity': pion_gaus_str,
-            }
+    my_vals = {
+        'Photon': {
+            'RMS': phot_rms_str,
+            'Effective RMS': phot_eff_rms_str,
+            'Gaussianity': phot_gaus_str,
+        },
+        'Pion': {
+            'RMS': pion_rms_str,
+            'Effective RMS': pion_eff_rms_str,
+            'Gaussianity': pion_gaus_str,
         }
+    }
 
-        val_df = pd.DataFrame(my_vals).reset_index()
-        val_df = val_df.rename(columns={'index': ''})
+    val_df = pd.DataFrame(my_vals).reset_index()
+    val_df = val_df.rename(columns={'index': ''})
 
-        return fig, dbc.Table.from_dataframe(val_df)
+    return fig, dbc.Table.from_dataframe(val_df)
+        

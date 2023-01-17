@@ -1,23 +1,35 @@
 import os
 import sys
-from threading import Timer
-from dash import Dash, dcc, html, Input, Output, callback
+
+from dash import dcc, html, Input, Output, callback
 import dash
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+
 import numpy as np
 import re
 import pandas as pd
-import webbrowser
 
 parent_dir = os.path.abspath(__file__ + 4 * '/..')
 sys.path.insert(0, parent_dir)
 
-from bye_splits.utils import params, common
+import argparse
+from bye_splits.utils import params, parsing, common
+
+parser = argparse.ArgumentParser(description='Clustering standalone step.')
+parsing.add_parameters(parser)
+FLAGS = parser.parse_args()
+assert FLAGS.sel in ('splits_only',) or FLAGS.sel.startswith('above_eta_') or FLAGS.sel.startswith('below_eta_')
+
+FLAGS.reg = 'All'
+FLAGS.sel = 'below_eta_2.7'
+
+input_files = params.fill_kw['FillInFiles']
 
 def_k = 0.0
 
+# Find the element of a list containing strings ['coef_{float_1}', 'coef_{float_2}', ...] which is closest to some float_i
 def closest(list, k=def_k):
     try:
         list = np.reshape(np.asarray(list), 1)
@@ -30,6 +42,10 @@ def closest(list, k=def_k):
     id = (np.abs(list-k_num)).argmin()
     return list[id]
 
+# Takes a dataframe 'df' with a column 'norm' to normalize by, and returns
+# 1) a binned matching efficiency list
+# 2) a binned list corresponding to 'norm' 
+# where the binning is done by percentage 'perc' of the size of the 'norm' column
 def binned_effs(df, norm, perc=0.1):
     eff_list = [0]
     en_list = [0]
@@ -47,10 +63,56 @@ def binned_effs(df, norm, perc=0.1):
             en_list.append(current_en)
     return eff_list, en_list
 
-phot_file = 'data/PU0/energy_out_ThresholdDummyHistomaxnoareath20_photon_0PU_truncation_hadd_with_pt_PAR_0p5_SEL_below_eta_2p7_REG_All_SW_1_SK_default_CA_min_distance.hdf5'
-pion_file1 = 'data/PU0/energy_out_ThresholdDummyHistomaxnoareath20_ntuple_1_with_pt_PAR_0p5_SEL_below_eta_2p7_REG_All_SW_1_SK_default_CA_min_distance.hdf5'
-pion_file2 = 'data/PU0/energy_out_ThresholdDummyHistomaxnoareath20_ntuple_2_with_pt_PAR_0p5_SEL_below_eta_2p7_REG_All_SW_1_SK_default_CA_min_distance.hdf5'
-pion_file3 = 'data/PU0/energy_out_ThresholdDummyHistomaxnoareath20_ntuple_3_with_pt_PAR_0p5_SEL_below_eta_2p7_REG_All_SW_1_SK_default_CA_min_distance.hdf5'
+def get_str(coef, file):
+    coef_str = 'coef_{}'.format(str(coef).replace('.','p'))
+    if coef_str not in file.keys():
+        coef_list = [float(re.split('coef_',key)[1].replace('p','.')) for key in file.keys()]
+        new_coef = closest(coef_list, coef)
+        coef_str = 'coef_{}'.format(str(new_coef).replace('.','p'))
+    return coef_str
+
+# Goal: Write function that finds and returns the DataFrames corresponding to a chosen coefficient in these files without explicitly referencing them
+def get_dfs(init_files, coef, pars):
+
+    file_dict = {}
+    start = params.energy_kw['EnergyOut']
+    df_dict = dict.fromkeys(init_files.keys(),[0.0])
+
+    for key in init_files.keys():
+        file_dict[key] = [start+re.split('gen_cl3d_tc',file)[1] for file in init_files[key]]
+        file_dict[key] = [common.fill_path(file,**pars) for file in file_dict[key]]
+        if len(file_dict[key])==1:
+
+            File = pd.HDFStore(file_dict[key][0],'r')
+            
+            coef_str = get_str(coef, File)
+            
+            df = File[coef_str]
+        else:
+            file_list = [pd.HDFStore(val,'r') for val in file_dict[key]]
+            coef_str = get_str(coef, file_list[0])
+            df_list = [file_list[i][coef_str] for i in range(len(file_list))]
+            df = pd.concat(df_list)
+        df_dict[key] = df
+    
+    return df_dict
+
+def get_keys(init_files, pars):
+
+    start = params.energy_kw['EnergyOut']
+
+    file_name = start+re.split('gen_cl3d_tc',init_files['photon'][0])[1]
+    file_path = common.fill_path(file_name, **pars)
+    
+    with pd.HDFStore(file_path, 'r') as File:
+        keys = File.keys()
+
+    return keys
+
+test=get_keys(input_files, vars(FLAGS))
+
+# Dash page setup
+##############################################################################################################################
 
 marks = {coef : {"label" : format(coef,'.3f'), "style": {"transform": "rotate(-90deg)"}} for coef in np.arange(0.0,0.05,0.001)}
 
@@ -90,6 +152,7 @@ layout = dbc.Container([
 
 ])
 
+# Callback function for display_color() which displays binned efficiency/energy graphs
 @callback(
     Output("eff-graph", "figure"),
     Output("glob-effs", "children"),
@@ -97,99 +160,91 @@ layout = dbc.Container([
     Input("eta_range", "value"),
     Input("normby", "value"))
 
+##############################################################################################################################
+
 def display_color(coef, eta_range, normby):
-    with pd.HDFStore(phot_file,'r') as Phot, pd.HDFStore(pion_file1,'r') as Pi1, pd.HDFStore(pion_file2,'r') as Pi2, pd.HDFStore(pion_file3,'r') as Pi3:
+    df_by_particle = get_dfs(input_files, coef, pars=vars(FLAGS))
+    phot_df = df_by_particle['photon']
+    pion_df = df_by_particle['pion']
 
-        coefs = np.linspace(0.0,0.05,50)
+    phot_df = phot_df[ (phot_df['genpart_exeta'] > eta_range[0]) ]
+    pion_df = pion_df[ (pion_df['genpart_exeta'] > eta_range[0]) ]
+    phot_df = phot_df[ (phot_df['genpart_exeta'] < eta_range[1]) ]
+    pion_df = pion_df[ (pion_df['genpart_exeta'] < eta_range[1]) ]
 
-        coef_str = 'coef_{}'.format(str(coef).replace('.','p'))
+    # Bin energy data into n% chunks to check eff/energy (10% is the default)
+    if normby=='Energy':
+        phot_effs, phot_x = binned_effs(phot_df, 'genpart_energy')
+        pion_effs, pion_x = binned_effs(pion_df, 'genpart_energy')
+    else:
+        phot_effs, phot_x = binned_effs(phot_df, 'genpart_pt')
+        pion_effs, pion_x = binned_effs(pion_df, 'genpart_pt')
 
-        if coef_str not in Phot.keys():
-            coef_list = [float(re.split('coef_',key)[1].replace('p','.')) for key in Phot.keys()]
-            new_coef = closest(coef_list, coef)
-            coef_str = 'coef_{}'.format(str(new_coef).replace('.','p'))
+    glob_effs = pd.DataFrame({'Photon': np.mean(phot_effs[1:]),
+                    'Pion': np.mean(pion_effs[1:])
+                    }, index=[0])
 
-        phot_df = Phot[coef_str]
-        pion_df = pd.concat([Pi1[coef_str],Pi2[coef_str],Pi3[coef_str]])
+    fig = make_subplots(rows=1, cols=2, subplot_titles=("Photon", "Pion"))
+
+    fig.add_trace(go.Scatter(x=phot_x, y=phot_effs, name='Photon'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=pion_x, y=pion_effs, name='Pion'), row=1, col=2)
+
+    fig.update_xaxes(title_text='Energy (GeV)')
+
+    fig.update_yaxes(type="log")
+
+    fig.update_layout(title_text='Efficiency/Energy', yaxis_title_text=r'$Eff (\frac{N_{Cl}}{N_{Gen}})$')
+
+    return fig, dbc.Table.from_dataframe(glob_effs)
+
+# Callback function for global_effs() which displays global efficiency as a function of the coefficent/radius
+@callback(
+    Output("glob-eff-graph", "figure"),
+    Input("eta_range", "value")
+)
+
+def global_effs(eta_range):
+
+    effs_by_coef = {'Photon': [0.0],
+                    'Pion': [0.0]}
+
+    coefs = get_keys(input_files, pars=vars(FLAGS))
+
+    for coef in coefs[1:]:
+        dfs_by_particle = get_dfs(input_files, coef, pars=vars(FLAGS))
+        phot_df = dfs_by_particle['photon']
+        pion_df = dfs_by_particle['pion']
 
         phot_df = phot_df[ (phot_df['genpart_exeta'] > eta_range[0]) ]
         pion_df = pion_df[ (pion_df['genpart_exeta'] > eta_range[0]) ]
         phot_df = phot_df[ (phot_df['genpart_exeta'] < eta_range[1]) ]
         pion_df = pion_df[ (pion_df['genpart_exeta'] < eta_range[1]) ]
 
-        # Bin energy data into n% chunks to check eff/energy (10% is the default)
-        if normby=='Energy':
-            phot_effs, phot_x = binned_effs(phot_df, 'genpart_energy')
-            pion_effs, pion_x = binned_effs(pion_df, 'genpart_energy')
-        else:
-            phot_effs, phot_x = binned_effs(phot_df, 'genpart_pt')
-            pion_effs, pion_x = binned_effs(pion_df, 'genpart_pt')
+        phot_eff = phot_df['matches'].value_counts(normalize=True)
+        pion_eff = pion_df['matches'].value_counts(normalize=True)
 
-        glob_effs = pd.DataFrame({'Photon': np.mean(phot_effs[1:]),
-                     'Pion': np.mean(pion_effs[1:])
-                     }, index=[0])
+        try:
+            phot_eff = phot_eff[True]
+            pion_eff = pion_eff[True]
+        except:
+            print("Troubleshooting...")
+            quit()
 
-        fig = make_subplots(rows=1, cols=2, subplot_titles=("Photon", "Pion"))
+        effs_by_coef['Photon'] = np.append(effs_by_coef['Photon'], phot_eff)
+        effs_by_coef['Pion'] = np.append(effs_by_coef['Pion'], pion_eff)
 
-        fig.add_trace(go.Scatter(x=phot_x, y=phot_effs, name='Photon'), row=1, col=1)
-        fig.add_trace(go.Scatter(x=pion_x, y=pion_effs, name='Pion'), row=1, col=2)
+    coefs = np.linspace(0.0,0.05,50)
 
-        fig.update_xaxes(title_text='Energy (GeV)')
+    fig = make_subplots(rows=1, cols=2, subplot_titles=("Photon", "Pion"))
 
-        fig.update_yaxes(type="log")
+    fig.add_trace(go.Scatter(x=coefs, y=effs_by_coef['Photon'], name='Photon'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=coefs, y=effs_by_coef['Pion'], name='Pion'), row=1, col=2)
 
-        fig.update_layout(title_text='Efficiency/Energy', yaxis_title_text=r'$Eff (\frac{N_{Cl}}{N_{Gen}})$')
+    fig.update_xaxes(title_text='Radius (Coefficient)')
 
-        return fig, dbc.Table.from_dataframe(glob_effs)
+    # Range [a,b] is defined by [10^a, 10^b], hence passing to log
+    fig.update_yaxes(type='log', range=[np.log10(0.997), np.log(1.001)])
 
-@callback(
-    Output("glob-eff-graph", "figure"),
-    Input("eta_range", "value"),
-    Input("normby", "value")
-)
+    fig.update_layout(title_text='Efficiency/Radius', yaxis_title_text=r'$Eff (\frac{N_{Cl}}{N_{Gen}})$')
 
-def global_effs(eta_range, normby):
-    with pd.HDFStore(phot_file,'r') as Phot, pd.HDFStore(pion_file1,'r') as Pi1, pd.HDFStore(pion_file2,'r') as Pi2, pd.HDFStore(pion_file3,'r') as Pi3:
-
-        effs_by_coef = {'Photon': [0.0],
-                        'Pion': [0.0]}
-
-        for coef in Phot.keys()[1:]:
-            phot_df = Phot[coef]
-            pion_df = pd.concat([Pi1[coef],Pi2[coef],Pi3[coef]])
-
-            phot_df = phot_df[ (phot_df['genpart_exeta'] > eta_range[0]) ]
-            pion_df = pion_df[ (pion_df['genpart_exeta'] > eta_range[0]) ]
-            phot_df = phot_df[ (phot_df['genpart_exeta'] < eta_range[1]) ]
-            pion_df = pion_df[ (pion_df['genpart_exeta'] < eta_range[1]) ]
-
-            phot_eff = phot_df['matches'].value_counts(normalize=True)
-            pion_eff = pion_df['matches'].value_counts(normalize=True)
-
-            try:
-                phot_eff = phot_eff[True]
-                pion_eff = pion_eff[True]
-            except:
-                print("Troubleshooting...")
-                quit()
-
-            effs_by_coef['Photon'] = np.append(effs_by_coef['Photon'], phot_eff)
-            effs_by_coef['Pion'] = np.append(effs_by_coef['Pion'], pion_eff)
-
-        coefs = np.linspace(0.0,0.05,50)
-
-        fig = make_subplots(rows=1, cols=2, subplot_titles=("Photon", "Pion"))
-
-        fig.add_trace(go.Scatter(x=coefs, y=effs_by_coef['Photon'], name='Photon'), row=1, col=1)
-        fig.add_trace(go.Scatter(x=coefs, y=effs_by_coef['Pion'], name='Pion'), row=1, col=2)
-
-        fig.update_xaxes(title_text='Radius (Coefficient)')
-
-        # Range [a,b] is defined by [10^a, 10^b], hence passing to log
-        fig.update_yaxes(type='log', range=[np.log10(0.997), np.log(1.001)])
-
-        fig.update_layout(title_text='Efficiency/Radius', yaxis_title_text=r'$Eff (\frac{N_{Cl}}{N_{Gen}})$')
-
-        return fig
-
-#global_effs([1.4,2.7],normby='Energy')
+    return fig
