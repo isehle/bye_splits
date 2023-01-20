@@ -226,7 +226,6 @@ class GeometryData(BaseData):
             df[ycorners_str[i]] = df.wafer_shift_y + ycorners[i]
 
         df['hex_x'] = df[xcorners_str].values.tolist()
-        df['hex_x'] = df['hex_x'].map(lambda x: [[x]])
         df['hex_y'] = df[ycorners_str].values.tolist()
         df['hex_y'] = df['hex_y'].map(lambda x: [[x]])
 

@@ -26,5 +26,8 @@ class EventDataParticle:
         default_events = self.config['defaultEvents'][self.particles]
         self.data = EventData(in_name, self.tag, default_events)
 
+    def provide_event_numbers(self):
+        return self.data.provide_event_numbers()
+   
     def provide_event(self, event):
         return self.data.provide_event(event)

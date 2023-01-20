@@ -12,6 +12,7 @@ sys.path.insert(0, parent_dir)
 import yaml
 import numpy as np
 import uproot as up
+import numpy as np
 import pandas as pd
 import awkward as ak
 import functools
@@ -61,6 +62,7 @@ class EventData(BaseData):
         self.cache = None
         self.events = default_events
         self.cache_events(self.events)
+        self.event_numbers = self.get_event_numbers()
 
     def cache_events(self, events):
         """Read dataset from parquet to cache"""
@@ -103,6 +105,7 @@ class EventData(BaseData):
         else:
             raise RuntimeError()
 
+<<<<<<< HEAD
         # for ev in events:
         #     if not ak.sum(ds.event == ev):
         #         mes = 'Event {} is not present in file {}.'
@@ -120,6 +123,13 @@ class EventData(BaseData):
 <<<<<<< HEAD
         print("Providing event {} data...".format(self.tag))
 =======
+=======
+    def get_event_numbers(self):
+        """Read event numbers from parquet file"""
+        ds = ak.from_parquet(self.outpath)
+        return ds.event
+
+>>>>>>> add dashApp for event display
     def provide(self):
 >>>>>>> :construction: geometry added; refletion issue to be solved
 =======
@@ -147,6 +157,7 @@ class EventData(BaseData):
             )
 
         return ret
+<<<<<<< HEAD
 
     def provide_events(self, events):
         """
@@ -182,6 +193,11 @@ class EventData(BaseData):
             self.rng = np.random.default_rng(seed=seed)
         events = self.rng.choice(self.ev_numbers, size=n, replace=False) if n!=-1 else -1
         return self.provide_events(events), events
+=======
+    
+    def provide_event_numbers(self):
+        return np.random.choice(self.event_numbers)
+>>>>>>> add dashApp for event display
 
     def select(self):
 <<<<<<< HEAD
