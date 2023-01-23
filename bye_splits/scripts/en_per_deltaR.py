@@ -234,6 +234,7 @@ def energy(pars, **kw):
         for coef in coefs:
             clust_params['CoeffA'] = (coef,0)*52 #28(EM)+24(FH+BH)
             print("Clustering with coef: ", coef)
+            breakpoint()
             cluster_test.cluster(pars, **clust_params)
 
     if kw['MatchFile']:
@@ -262,8 +263,10 @@ if __name__ == "__main__":
         for file in files:
             energy_pars = common.dict_per_file(params,file)['energy']
 
-            energy_pars['ReInit'] = False
-            energy_pars['MatchFile'] = False
+            energy_pars['ReInit'] = True
+            energy_pars['MatchFile'] = True
+
+            breakpoint()
 
             energy(vars(FLAGS), **energy_pars)
 

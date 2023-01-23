@@ -170,7 +170,7 @@ def cluster(pars, **kw):
 
                 en_df = dfout.join(GenFile[kw['FesAlgos'][0]], on='event', how='inner')
 
-                sub_df = en_df[['event','etanew','phinew','en','cl3d_pt','genpart_exphi','genpart_exeta','genpart_energy','genpart_pt']].drop_duplicates()
+                sub_df = en_df[['event','etanew','phinew','en','cl3d_pt','genpart_exphi','genpart_exeta','genpart_energy','genpart_pt', 'Ncells']].drop_duplicates()
 
                 EnOut.put(coef,sub_df)
                 EnOut.close()
