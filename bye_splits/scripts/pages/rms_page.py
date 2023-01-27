@@ -14,7 +14,7 @@ parent_dir = '/home/llr/cms/ehle/git/bye_splits_final/'
 sys.path.insert(0, parent_dir)
 
 import argparse
-print(sys.version)
+import bye_splits
 from bye_splits.utils import params, parsing, common
 
 # Set up to work with the rest of the files in the pipeline

@@ -18,6 +18,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 import argparse
+import bye_splits
 from bye_splits.utils import params, parsing
 
 parser = argparse.ArgumentParser(description='Clustering standalone step.')
