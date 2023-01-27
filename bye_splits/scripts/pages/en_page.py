@@ -1,7 +1,9 @@
 import os
 import sys
 
-parent_dir = os.path.abspath(__file__ + 4 * '/..')
+#parent_dir = os.path.abspath(__file__ + 4 * '/..')
+parent_dir = '/home/llr/cms/ehle/git/bye_splits_final/'
+
 sys.path.insert(0, parent_dir)
 
 from bye_splits.utils import common
