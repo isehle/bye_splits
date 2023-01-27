@@ -105,6 +105,9 @@ def get_keys(init_files, pars):
     file_name = start+re.split('gen_cl3d_tc',init_files['photon'][0])[1]
     file_path = common.fill_path(file_name, **pars)
     
+    # testing
+    print("Filepath: ", file_path)
+
     with pd.HDFStore(file_path, 'r') as File:
         keys = File.keys()
 
