@@ -2,7 +2,7 @@ import os
 import sys
 
 #parent_dir = os.path.abspath(__file__ + 4 * '/..')
-parent_dir = '/home/llr/cms/ehle/git/bye_splits_final/'
+parent_dir = '/eos/user/i/iehle/data/PU0/'
 
 sys.path.insert(0, parent_dir)
 

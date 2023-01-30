@@ -106,7 +106,7 @@ def get_keys(init_files, pars):
     file_path = common.fill_path(file_name, **pars)
     
     # testing
-    print("Filepath: ", file_path)
+    print("\nFilepath: {}\n".format(file_path))
 
     with pd.HDFStore(file_path, 'r') as File:
         keys = File.keys()
