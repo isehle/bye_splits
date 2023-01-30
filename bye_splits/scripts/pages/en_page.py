@@ -91,6 +91,7 @@ def plot_norm(normby, eta_range, pars=vars(FLAGS), init_files=input_files):
                     normed_energies[key] = np.append(normed_energies[key],mean_energy)
         else:
             file_list = [pd.HDFStore(val,'r') for val in plot_dict[key]]
+            print("\nTroubleshooting:\nFiles: {}\n".format(file_list))
             coef_strs = file_list[0].keys()
             if normby=='max':
                 max = pd.concat([file_list[i][coef_strs[-1]].set_index('event').drop(columns=['matches','en_max']) for i in range(len(file_list))])
