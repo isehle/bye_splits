@@ -233,7 +233,7 @@ def write_eff_file(norm, coefs, eta, file):
         phot_df = phot_df[ (phot_df['genpart_exeta'] < eta[1]) ]
         pion_df = pion_df[ (pion_df['genpart_exeta'] < eta[1]) ]
 
-        if normby=='Energy':
+        if norm=='Energy':
             phot_eff, _ = binned_effs(phot_df, 'genpart_energy', 1.)
             pion_eff, _ = binned_effs(pion_df, 'genpart_energy', 1.)
         else:
@@ -263,28 +263,6 @@ def global_effs(eta_range, normby, file="global_eff.hdf5"):
 
     if not os.path.exists(filename):    
         effs_by_coef = write_eff_file(normby, coefs, eta_range, filename)
-        '''for coef in coefs[1:]:
-            dfs_by_particle = get_dfs(input_files, coef, pars=vars(FLAGS))
-            phot_df = dfs_by_particle['photon']
-            pion_df = dfs_by_particle['pion']
-
-            phot_df = phot_df[ (phot_df['genpart_exeta'] > eta_range[0]) ]
-            pion_df = pion_df[ (pion_df['genpart_exeta'] > eta_range[0]) ]
-            phot_df = phot_df[ (phot_df['genpart_exeta'] < eta_range[1]) ]
-            pion_df = pion_df[ (pion_df['genpart_exeta'] < eta_range[1]) ]
-
-            if normby=='Energy':
-                phot_eff, _ = binned_effs(phot_df, 'genpart_energy', 1.)
-                pion_eff, _ = binned_effs(pion_df, 'genpart_energy', 1.)
-            else:
-                phot_eff, _ = binned_effs(phot_df, 'genpart_pt', 1.)
-                pion_eff, _ = binned_effs(pion_df, 'genpart_pt', 1.)
-
-            effs_by_coef['Photon'] = np.append(effs_by_coef['Photon'], phot_eff)
-            effs_by_coef['Pion'] = np.append(effs_by_coef['Pion'], pion_eff)
-        
-        with pd.HDFStore(filename, "w") as glob_eff_file:
-            glob_eff_file.put('Eff', pd.DataFrame.from_dict(effs_by_coef))'''
     
     else:
         try:
@@ -293,6 +271,9 @@ def global_effs(eta_range, normby, file="global_eff.hdf5"):
         except:
             os.remove(filename)
             effs_by_coef = write_eff_file(normby, coefs, eta_range, filename)
+
+    print("\nGlobal Eff Troubleshooting: \n===========================\n")
+    print("\nEff Dict: \n{}\n".format(effs_by_coef))
 
     coefs = np.linspace(0.0,0.05,50)
 
