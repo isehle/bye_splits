@@ -77,6 +77,9 @@ def get_dfs(init_files, coef, pars):
             
             df = File[coef_str]
         else:
+            for val in file_dict[key]:
+                print("\nKey: {}\n".format(key))
+                print("\nVal: {}\n".format(val))
             file_list = [pd.HDFStore(val,'r') for val in file_dict[key]]
             coef_str = get_str(coef, file_list[0])
             df_list = [file_list[i][coef_str] for i in range(len(file_list))]
