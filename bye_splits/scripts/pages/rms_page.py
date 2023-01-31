@@ -9,7 +9,6 @@ import re
 import pandas as pd
 
 parent_dir = '/eos/user/i/iehle/data/PU0/'
-
 sys.path.insert(0, parent_dir)
 
 import argparse

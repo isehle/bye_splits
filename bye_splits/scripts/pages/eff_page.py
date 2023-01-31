@@ -11,7 +11,9 @@ import numpy as np
 import re
 import pandas as pd
 
-parent_dir = '/eos/user/i/iehle/data/PU0/'
+data_dir = '/eos/user/i/iehle/data/PU0/'
+
+parent_dir = os.path.abspath(__file__ + 4 * '/..')
 sys.path.insert(0, parent_dir)
 
 import argparse
@@ -214,7 +216,7 @@ def global_effs(eta_range, normby, file="global_eff.hdf5"):
 
     coefs = get_keys(input_files, pars=vars(FLAGS))
 
-    filename = "{}{}_eta_{}_{}_{}".format(parent_dir, normby, eta_range[0], eta_range[1], file)
+    filename = "{}{}_eta_{}_{}_{}".format(data_dir, normby, eta_range[0], eta_range[1], file)
 
     if not os.path.exists(filename):
         effs_by_coef = {'Photon': [0.0],
