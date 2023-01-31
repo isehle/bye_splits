@@ -86,12 +86,14 @@ def get_dfs(init_files, coef, pars):
 
             File = pd.HDFStore(file_dict[key][0],'r')
             
-            coef_str = get_str(coef, File)
+            if not isinstance(coef, str):
+                coef_str = get_str(coef, File)
             
             df = File[coef_str]
         else:
             file_list = [pd.HDFStore(val,'r') for val in file_dict[key]]
-            coef_str = get_str(coef, file_list[0])
+            if not isinstance(coef, str):
+                coef_str = get_str(coef, file_list[0])
             df_list = [file_list[i][coef_str] for i in range(len(file_list))]
             df = pd.concat(df_list)
         df_dict[key] = df
@@ -204,38 +206,47 @@ def display_color(coef, eta_range, normby):
 # Callback function for global_effs() which displays global efficiency as a function of the coefficent/radius
 @callback(
     Output("glob-eff-graph", "figure"),
-    Input("eta_range", "value")
+    Input("eta_range", "value"),
+    Input("normby", "value")
 )
 
-def global_effs(eta_range):
-
-    effs_by_coef = {'Photon': [0.0],
-                    'Pion': [0.0]}
+def global_effs(eta_range, normby, file="global_eff.hdf5"):
 
     coefs = get_keys(input_files, pars=vars(FLAGS))
 
-    for coef in coefs[1:]:
-        dfs_by_particle = get_dfs(input_files, coef, pars=vars(FLAGS))
-        phot_df = dfs_by_particle['photon']
-        pion_df = dfs_by_particle['pion']
+    filename = "{}{}_eta_{}_{}_{}".format(parent_dir, normby, eta_range[0], eta_range[1], file)
 
-        phot_df = phot_df[ (phot_df['genpart_exeta'] > eta_range[0]) ]
-        pion_df = pion_df[ (pion_df['genpart_exeta'] > eta_range[0]) ]
-        phot_df = phot_df[ (phot_df['genpart_exeta'] < eta_range[1]) ]
-        pion_df = pion_df[ (pion_df['genpart_exeta'] < eta_range[1]) ]
+    if not os.path.exists(filename):
+        effs_by_coef = {'Photon': [0.0],
+                        'Pion': [0.0]}    
 
-        phot_eff = phot_df['matches'].value_counts(normalize=True)
-        pion_eff = pion_df['matches'].value_counts(normalize=True)
+        for coef in coefs[1:]:
+            dfs_by_particle = get_dfs(input_files, coef, pars=vars(FLAGS))
+            phot_df = dfs_by_particle['photon']
+            pion_df = dfs_by_particle['pion']
 
-        try:
-            phot_eff = phot_eff[True]
-            pion_eff = pion_eff[True]
-        except:
-            print("Troubleshooting...")
-            quit()
+            phot_df = phot_df[ (phot_df['genpart_exeta'] > eta_range[0]) ]
+            pion_df = pion_df[ (pion_df['genpart_exeta'] > eta_range[0]) ]
+            phot_df = phot_df[ (phot_df['genpart_exeta'] < eta_range[1]) ]
+            pion_df = pion_df[ (pion_df['genpart_exeta'] < eta_range[1]) ]
 
-        effs_by_coef['Photon'] = np.append(effs_by_coef['Photon'], phot_eff)
-        effs_by_coef['Pion'] = np.append(effs_by_coef['Pion'], pion_eff)
+            # Global <==> consider the entire range as a "bin"
+            if normby=='Energy':
+                phot_eff, _ = binned_effs(phot_df, 'genpart_energy', 1.)
+                pion_eff, _ = binned_effs(pion_df, 'genpart_energy', 1.)
+            else:
+                phot_eff, _ = binned_effs(phot_df, 'genpart_pt', 1.)
+                pion_eff, _ = binned_effs(pion_df, 'genpart_pt', 1.)
+
+            effs_by_coef['Photon'] = np.append(effs_by_coef['Photon'], phot_eff)
+            effs_by_coef['Pion'] = np.append(effs_by_coef['Pion'], pion_eff)
+        
+        with pd.HDFStore(filename, "w") as glob_eff_file:
+            glob_eff_file.put('Eff', pd.DataFrame.from_dict(effs_by_coef))
+    
+    else:
+        with pd.HDFStore(filename, "r") as glob_eff_file:
+            effs_by_coef = glob_eff_file['/Eff'].to_dict(orient='list')
 
     coefs = np.linspace(0.0,0.05,50)
 
