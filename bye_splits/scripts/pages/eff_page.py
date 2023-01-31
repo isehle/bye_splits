@@ -87,14 +87,14 @@ def get_dfs(init_files, coef, pars):
             File = pd.HDFStore(file_dict[key][0],'r')
             
             if not isinstance(coef, str):
-                coef_str = get_str(coef, File)
+                coef = get_str(coef, File)
             
-            df = File[coef_str]
+            df = File[coef]
         else:
             file_list = [pd.HDFStore(val,'r') for val in file_dict[key]]
             if not isinstance(coef, str):
-                coef_str = get_str(coef, file_list[0])
-            df_list = [file_list[i][coef_str] for i in range(len(file_list))]
+                coef = get_str(coef, file_list[0])
+            df_list = [file_list[i][coef] for i in range(len(file_list))]
             df = pd.concat(df_list)
         df_dict[key] = df
     
@@ -132,7 +132,7 @@ layout = dbc.Container([
     dcc.Graph(id="eff-graph",mathjax=True),
 
     html.P("Coef:"),
-    dcc.Slider(id="coef", min=0.0, max=0.05, value=0,marks=marks),
+    dcc.Slider(id="coef", min=0.0, max=0.05, value=0.001,marks=marks),
 
     html.P("EtaRange:"),
     dcc.RangeSlider(id='eta_range',min=1.4,max=2.7,step=0.1,value=[1.4,2.7]),
