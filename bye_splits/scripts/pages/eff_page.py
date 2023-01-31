@@ -53,17 +53,26 @@ def binned_effs(df, norm, perc=0.1):
     eff_list = [0]
     en_list = [0]
     en_bin_size = perc*(df[norm].max() - df[norm].min())
-    current_en = 0
-    for i in range(100):
-        match_column = df.loc[df[norm].between(current_en, (i+1)*en_bin_size, 'left'), 'matches']
+    if not perc==1.:
+        current_en = 0
+        for i in range(100):
+            match_column = df.loc[df[norm].between(current_en, (i+1)*en_bin_size, 'left'), 'matches']
+            if not match_column.empty:
+                try:
+                    eff = float(match_column.value_counts(normalize=True))
+                except:
+                    eff = match_column.value_counts(normalize=True)[True]
+                eff_list.append(eff)
+                current_en += en_bin_size
+                en_list.append(current_en)
+    else:
+        match_column = df.loc[df[norm].between(0, en_bin_size, 'left'), 'matches']
         if not match_column.empty:
             try:
                 eff = float(match_column.value_counts(normalize=True))
             except:
                 eff = match_column.value_counts(normalize=True)[True]
-            eff_list.append(eff)
-            current_en += en_bin_size
-            en_list.append(current_en)
+            eff_list = eff
     return eff_list, en_list
 
 def get_str(coef, file):
@@ -232,7 +241,6 @@ def global_effs(eta_range, normby, file="global_eff.hdf5"):
             phot_df = phot_df[ (phot_df['genpart_exeta'] < eta_range[1]) ]
             pion_df = pion_df[ (pion_df['genpart_exeta'] < eta_range[1]) ]
 
-            # Global <==> consider the entire range as a "bin"
             if normby=='Energy':
                 phot_eff, _ = binned_effs(phot_df, 'genpart_energy', 1.)
                 pion_eff, _ = binned_effs(pion_df, 'genpart_energy', 1.)
