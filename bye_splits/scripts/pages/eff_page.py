@@ -54,6 +54,7 @@ def binned_effs(df, norm, perc=0.1):
     en_list = [0]
     en_bin_size = perc*(df[norm].max() - df[norm].min())
     if not perc==1.:
+        print("This would be very weird...")
         current_en = 0
         for i in range(100):
             match_column = df.loc[df[norm].between(current_en, (i+1)*en_bin_size, 'left'), 'matches']
