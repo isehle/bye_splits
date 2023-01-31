@@ -92,12 +92,6 @@ def get_dfs(init_files, coef, pars):
         else:
             file_list = [pd.HDFStore(val,'r') for val in file_dict[key]]
             coef_str = get_str(coef, file_list[0])
-            print("\nEff Troubleshooting\n============================\n")
-            print("\nKey: {}\n".format(key))
-            print("\nFileDict[key]: {}\n".format(file_dict[key]))
-            print("\nCoef: {}\n".format(coef_str))
-            print("\nFileList[0]: {}\n".format(file_list[0]))
-            print("\nDF: {}\n".format(file_list[0][coef_str]))
             df_list = [file_list[i][coef_str] for i in range(len(file_list))]
             df = pd.concat(df_list)
         df_dict[key] = df
@@ -199,11 +193,11 @@ def display_color(coef, eta_range, normby):
     fig.add_trace(go.Scatter(x=phot_x, y=phot_effs, name='Photon'), row=1, col=1)
     fig.add_trace(go.Scatter(x=pion_x, y=pion_effs, name='Pion'), row=1, col=2)
 
-    fig.update_xaxes(title_text='Energy (GeV)')
+    fig.update_xaxes(title_text="{} (GeV)".format(normby))
 
     fig.update_yaxes(type="log")
 
-    fig.update_layout(title_text='Efficiency/Energy', yaxis_title_text=r'$Eff (\frac{N_{Cl}}{N_{Gen}})$')
+    fig.update_layout(title_text="Efficiency/{}".format(normby), yaxis_title_text=r'$Eff (\frac{N_{Cl}}{N_{Gen}})$')
 
     return fig, dbc.Table.from_dataframe(glob_effs)
 
