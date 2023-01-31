@@ -96,12 +96,12 @@ def plot_norm(normby, eta_range, pars=vars(FLAGS), init_files=input_files):
                 max = pd.concat([file_list[i][coef_strs[-1]].set_index('event').drop(columns=['matches','en_max']) for i in range(len(file_list))])
             for coef in coef_strs[1:]:
                 df_list = [file_list[i][coef] for i in range(len(file_list))]
-                print("\nEnergy \n============================\n")
+                '''print("\nEnergy \n============================\n")
                 print("\nKey: {}\n".format(key))
                 print("\nFileDict[key]: {}\n".format(file_dict[key]))
                 print("\nCoef: {}\n".format(coef))
                 print("\nFileList[0]: {}\n".format(file_list[0]))
-                print("\nDF: {}\n".format(file_list[0][coef_str]))
+                print("\nDF: {}\n".format(file_list[0][coef_str]))'''
                 full_df = pd.concat(df_list)
                 full_df = full_df.set_index('event').drop(columns=['matches', 'en_max'])
 
