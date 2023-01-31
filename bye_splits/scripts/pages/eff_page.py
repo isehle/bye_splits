@@ -92,11 +92,12 @@ def get_dfs(init_files, coef, pars):
         else:
             file_list = [pd.HDFStore(val,'r') for val in file_dict[key]]
             coef_str = get_str(coef, file_list[0])
-            print("\nTroubleshooting\n============================\n")
+            print("\nEff Troubleshooting\n============================\n")
             print("\nKey: {}\n".format(key))
             print("\nFileDict[key]: {}\n".format(file_dict[key]))
             print("\nCoef: {}\n".format(coef_str))
             print("\nFileList[0]: {}\n".format(file_list[0]))
+            print("\nDF: {}\n".format(file_list[0][coef_str]))
             df_list = [file_list[i][coef_str] for i in range(len(file_list))]
             df = pd.concat(df_list)
         df_dict[key] = df
