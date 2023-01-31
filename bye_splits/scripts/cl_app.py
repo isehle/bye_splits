@@ -53,4 +53,4 @@ if __name__ == '__main__':
 
     host, port = socket.gethostbyname(socket.gethostname()), 8050
 
-    app.run_server(port=port, host=host)
+    app.run_server(port=port, host=host, debug=True)
