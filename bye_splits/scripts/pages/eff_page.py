@@ -67,12 +67,18 @@ def binned_effs(df, norm, perc=0.1):
                 en_list.append(current_en)
     else:
         match_column = df.loc[df[norm].between(0, en_bin_size, 'left'), 'matches']
+        print("\nEff Troubleshooting\n======================\n")
+        print("\nNormalization: {}".format(norm))
+        print("\nBin size: {}".format(en_bin_size))
+        print("\nDF: \n{}\n".format(df))
+        print("\nMatches: \n{}\n".format(match_column))
         if not match_column.empty:
             try:
                 eff = float(match_column.value_counts(normalize=True))
             except:
                 eff = match_column.value_counts(normalize=True)[True]
             eff_list = eff
+        print("\nEff: {}".format(eff_list))
     return eff_list, en_list
 
 def get_str(coef, file):
@@ -125,8 +131,6 @@ def get_keys(init_files, pars):
         keys = File.keys()
 
     return keys
-
-test=get_keys(input_files, vars(FLAGS))
 
 # Dash page setup
 ##############################################################################################################################
