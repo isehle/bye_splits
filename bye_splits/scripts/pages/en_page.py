@@ -64,7 +64,7 @@ def fill_dict_w_mean_norm(coef, df, norm, out_dict):
 
     out_dict[key] = np.append(out_dict[key],mean_energy)    
 
-def write_plot_file(input_files, norm, eta, outfile):
+def write_plot_file(input_files, norm, eta, outfile, pars=vars(FLAGS)):
     plot_dict = {}
     normed_energies = dict.fromkeys(input_files.keys(),[0.0]) # Initialize at 0 since we only consider coefs[1:] (coefs[0] is an empty dataframe)
     start = params.energy_kw['EnergyOut']
