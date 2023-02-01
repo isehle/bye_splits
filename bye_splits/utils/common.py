@@ -77,6 +77,9 @@ def fill_path(base_path, data_dir=params.LocalStorage, ext="hdf5", **kw):
     return os.path.join(data_dir, base_path)
 
 
+'''class DictHelp:
+    def __init__(self, )'''
+
 class SupressSettingWithCopyWarning:
     """
     Temporarily supress pandas SettingWithCopyWarning.
