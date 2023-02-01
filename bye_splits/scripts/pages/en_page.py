@@ -47,31 +47,35 @@ layout = html.Div([
     dcc.Dropdown(['Energy', 'PT'], 'Energy', id='normby')
 ])
 
-@callback(
-    Output("cl-en-graph", "figure"),
-    Input("normby", "value"),
-    Input("eta_range", "value"))
-
-def plot_norm(normby, eta_range, pars=vars(FLAGS), init_files=input_files):
-    global y_axis_title
-
-    if normby=='Energy':
-        y_axis_title = r'$\frac{\bar{E_{Cl}}}{\bar{E}_{Gen}}$'
-    elif normby=='PT':
-        y_axis_title = r'$\frac{\bar{p_T}^{Cl}}{\bar{p_T}^{Gen}}$'
+def fill_dict_w_mean_norm(coef, df, norm, out_dict):
+    if norm=='max':
+        df = df.join(max, on='event',rsuffix='_max')
+        df['normed_energies'] = df['en']/df['en_max']
+    elif norm=='PT':
+        df['pt'] = df['en']/np.cosh(df['etanew'])
+        df['normed_energies'] = df['pt']/df['genpart_pt']
     else:
-        y_axis_title = r'$\frac{E_{Cl}}{E_{Max}}$'
+        df['normed_energies'] = df['en']/df['genpart_energy']
 
+    df = df[ df['genpart_exeta'] > eta[0] ]
+    df = df[ df['genpart_exeta'] < eta[1] ]
+
+    mean_energy = df['normed_energies'].mean()
+
+    out_dict[key] = np.append(out_dict[key],mean_energy)    
+
+def write_plot_file(input_files, norm, eta, outfile):
     plot_dict = {}
-    normed_energies = dict.fromkeys(init_files.keys(),[0.0]) # Initialize at 0 since we only consider coefs[1:] (coefs[0] is an empty dataframe)
+    normed_energies = dict.fromkeys(input_files.keys(),[0.0]) # Initialize at 0 since we only consider coefs[1:] (coefs[0] is an empty dataframe)
     start = params.energy_kw['EnergyOut']
-    for key in init_files.keys():
-        plot_dict[key] = [start+re.split('gen_cl3d_tc',file)[1] for file in init_files[key]]
+    for key in input_files.keys():
+        plot_dict[key] = [start+re.split('gen_cl3d_tc',file)[1] for file in input_files[key]]
         plot_dict[key] = [common.fill_path(file,**pars) for file in plot_dict[key]]
+        
         if len(plot_dict[key])==1:
             with pd.HDFStore(plot_dict[key][0],'r') as File:
                 coef_strs = File.keys()
-                if normby=='max':
+                if norm=='max':
                     max = File[coef_strs[-1]].set_index('event').drop(columns=['matches','en_max'])
                 for coef in coef_strs[1:]:
                     df = File[coef].set_index('event').drop(columns=['matches', 'en_max'])
@@ -83,21 +87,25 @@ def plot_norm(normby, eta_range, pars=vars(FLAGS), init_files=input_files):
                     else:
                         df['normed_energies'] = df['en']/df['genpart_energy']
 
-                    df = df[ df['genpart_exeta'] > eta_range[0] ]
-                    df = df[ df['genpart_exeta'] < eta_range[1] ]
-
-                    mean_energy = df['normed_energies'].mean()
-
-                    normed_energies[key] = np.append(normed_energies[key],mean_energy)
         else:
             file_list = [pd.HDFStore(val,'r') for val in plot_dict[key]]
             coef_strs = file_list[0].keys()
-            if normby=='max':
+            if norm=='max':
                 max = pd.concat([file_list[i][coef_strs[-1]].set_index('event').drop(columns=['matches','en_max']) for i in range(len(file_list))])
             for coef in coef_strs[1:]:
                 df_list = [file_list[i][coef] for i in range(len(file_list))]
                 full_df = pd.concat(df_list)
+
                 full_df = full_df.set_index('event').drop(columns=['matches', 'en_max'])
+                fill_dict_w_mean_norm(coef, full_df, norm, normed_energies)
+
+            for file in file_list:
+                file.close()
+    
+    with pd.HDFStore(outfile, 'w') as PlotFile:
+        PlotFile.put('Normed_Dist', pd.DataFrame.from_dict(normed_energies))
+    
+    return normed_energies
 
                 if normby=='max':
                     full_df = full_df.join(max,rsuffix='_max')
@@ -107,15 +115,32 @@ def plot_norm(normby, eta_range, pars=vars(FLAGS), init_files=input_files):
                 else:
                     full_df['normed_energies'] = full_df['en']/full_df['genpart_energy']
 
-                full_df = full_df[ full_df['genpart_exeta'] > eta_range[0] ]
-                full_df = full_df[ full_df['genpart_exeta'] < eta_range[1] ]
+@callback(
+    Output("cl-en-graph", "figure"),
+    Input("normby", "value"),
+    Input("eta_range", "value"))
 
-                mean_energy = full_df['normed_energies'].mean()
+def plot_norm(normby, eta_range, pars=vars(FLAGS), init_files=input_files, plot_file='normed_distribution'):
+    global y_axis_title
 
-                normed_energies[key] = np.append(normed_energies[key], mean_energy)
+    if normby=='Energy':
+        y_axis_title = r'$\frac{\bar{E_{Cl}}}{\bar{E}_{Gen}}$'
+    elif normby=='PT':
+        y_axis_title = r'$\frac{\bar{p_T}^{Cl}}{\bar{p_T}^{Gen}}$'
+    else:
+        y_axis_title = r'$\frac{E_{Cl}}{E_{Max}}$'
 
-            for file in file_list:
-                file.close()
+    plot_filename = "{}{}_{}_eta_{}_{}.hdf5".format(parent_dir, normby, plot_file, eta_range[0], eta_range[1])
+
+    if not os.path.exists(plot_filename):
+        normed_dist = write_plot_file(init_files, normby, eta_range, plot_filename)
+    else:
+        try:
+            with pd.HDFStore(plot_filename, "r") as PlotFile:
+                normed_dist = PlotFile['/Normed_Dist'].to_dict(orient='list')
+        except:
+            os.remove(plot_filename)
+            normed_dist = write_plot_file(init_files, normby, eta_range, plot_filename)
 
     start, end, tot = params.energy_kw['Coeffs']
     coefs = np.linspace(start, end, tot)
@@ -125,8 +150,8 @@ def plot_norm(normby, eta_range, pars=vars(FLAGS), init_files=input_files):
 
     fig = make_subplots(rows=1, cols=2, subplot_titles=("Photon", "Pion"))
 
-    en_phot = normed_energies['photon']
-    en_pion = normed_energies['pion']
+    en_phot = normed_dist['photon']
+    en_pion = normed_dist['pion']
 
     fig.add_trace(go.Scatter(x=coefs, y=en_phot, name='Photon'), row=1, col=1)
     fig.add_trace(go.Scatter(x=coefs, y=en_pion, name='Pion'), row=1, col=2)
