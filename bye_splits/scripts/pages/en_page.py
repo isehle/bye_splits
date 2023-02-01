@@ -47,7 +47,7 @@ layout = html.Div([
     dcc.Dropdown(['Energy', 'PT'], 'Energy', id='normby')
 ])
 
-def fill_dict_w_mean_norm(coef, eta, df, norm, out_dict):
+def fill_dict_w_mean_norm(key, coef, eta, df, norm, out_dict):
     if norm=='max':
         df = df.join(max, on='event',rsuffix='_max')
         df['normed_energies'] = df['en']/df['en_max']
@@ -97,7 +97,7 @@ def write_plot_file(input_files, norm, eta, outfile, pars=vars(FLAGS)):
                 full_df = pd.concat(df_list)
 
                 full_df = full_df.set_index('event').drop(columns=['matches', 'en_max'])
-                fill_dict_w_mean_norm(coef, eta, full_df, norm, normed_energies)
+                fill_dict_w_mean_norm(key, coef, eta, full_df, norm, normed_energies)
 
             for file in file_list:
                 file.close()
