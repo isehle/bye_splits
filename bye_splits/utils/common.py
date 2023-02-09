@@ -25,6 +25,9 @@ import re
 import re
 from copy import deepcopy
 
+import re
+from copy import copy, deepcopy
+
 def binConv(vals, dist, amin):
     """
     Converts bin indexes back to values (central values in the bin).
