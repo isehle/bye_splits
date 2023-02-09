@@ -17,6 +17,13 @@ MinROverZ = 0.076
 MaxROverZ = 0.58
 MinPhi = -np.pi
 MaxPhi = +np.pi
+PileUp = "PU0"
+local = True
+if local:   
+    base_dir = "/grid_mnt/vol_home/llr/cms/ehle/Repos/bye_splits_final/"
+else:
+    base_dir = "/eos/user/i/iehle/"
+DataFolder = 'data/{}/{}'.format(PileUp,particle)
 LocalDataFolder = 'data/new_algos'
 EOSDataFolder = '/eos/user/b/bfontana/FPGAs/new_algos/'
 
@@ -41,10 +48,13 @@ base_kw = {
     'LayerEdges': [0,42],
     'IsHCAL': False,
 
-    'DataFolder': Path(LocalDataFolder),
-    'FesAlgos': ['ThresholdDummyHistomaxnoareath20'],
-    'BasePath': Path(__file__).parents[2] / LocalDataFolder,
-    'OutPath': Path(__file__).parents[2] / 'out',
+    'DataFolder': Path(f"{base_dir}{DataFolder}"),
+    'FesAlgos': ['FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple/HGCalTriggerNtuple'],
+    'BasePath': "{}{}".format(base_dir, DataFolder),
+    'OutPath': "{}out".format(base_dir),
+
+    'RzBinEdges': np.linspace( MinROverZ, MaxROverZ, num=NbinsRz+1 ),
+    'PhiBinEdges': np.linspace( MinPhi, MaxPhi, num=NbinsPhi+1 ),
 
     'Placeholder': np.nan,
 }
@@ -72,7 +82,7 @@ if len(base_kw['FesAlgos'])!=1:
 
 # fill task
 fill_kw = set_dictionary(
-    {'FillIn'      : 'summ_photon_truncation',
+    {'FillIn'      : None, # Set per file, see common.FileDict
      'FillOut'     : 'fill',
      'FillOutComp' : 'fill_comp',
      'FillOutPlot' : 'fill_plot' }
@@ -127,7 +137,10 @@ cluster_kw = set_dictionary(
                   (0.050,)*12 ), # BH
       'CoeffB': 0,
       'MidRadius': 2.3,
-      'PtC3dThreshold': 0.5 }
+      'PtC3dThreshold': 0.5,
+      'ForEnergy': False,
+      'EnergyOut': 'cluster_energy',
+      'GenPart': fill_kw['FillIn']}
 )
 
 # validation task
@@ -135,6 +148,19 @@ validation_kw = set_dictionary(
     { 'ClusterOutValidation': cluster_kw['ClusterOutValidation'],
       'FillOutComp' : fill_kw['FillOutComp'],
       'FillOut': fill_kw['FillOut'] }
+)
+
+# energy task
+energy_kw = set_dictionary(
+    { 'ClusterIn': cluster_kw['ClusterOutValidation'],
+      'Coeff': cluster_kw['CoeffA'],
+      'ReInit': False,
+      'Coeffs': (0.0, 0.05, 50), #tuple containing (coeff_start, coeff_end, num_coeffs)
+      'EnergyIn': cluster_kw['EnergyOut'],
+      'EnergyOut': 'energy_out',
+      'BestMatch': True,
+      'MatchFile': False,
+      'MakePlot': True}
 )
 
 disconnectedTriggerLayers = [

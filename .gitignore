@@ -1,23 +1,35 @@
-# git ls-files --others --exclude-from=.git/info/exclude
-# Lines that start with '#' are comments.
-# For a project mostly in C, the following would be a good set of
-# exclude patterns (uncomment them if you want to use them):
-# *.[oa]
-*~
-*_pycache_*
-/logs/
-/callback.html
-/*.png
-/#nn_optimization.py#
-/.env
-*data/
-*out/
-*.o
+# Ignore VS Code files
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+
+# Local History for Visual Studio Code
+.history/
+
+# Built Visual Studio Code Extensions
+*.vsix
+
+# Directories
+*__pychache__/
+*.deps/
+yaml-cpp-yaml-cpp-0.7.0/
+data/
+out/
+bye_splits/production/submit_scripts/
+
+
+# Exec etc files
 *.exe
-*.deps*
-*data/*
-*parquet
-*html
-yaml-cpp-yaml-cpp-0.7.0*
-*#
-*.#*
+*.DS_Store
+*.pyc
+*.o
+*.d
+*.diff
+settings.json
+conda_byesplits.sh
+
+# Test scripts
+dict_testing.py

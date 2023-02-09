@@ -144,6 +144,20 @@ def cluster(pars, **kw):
                 else:
                     dfout = pd.concat((dfout,cl3d[cl3d_cols+['event']]), axis=0)
 
+            if kw['ForEnergy']:
+                dfout.event = dfout.event.astype(int)
+                coef = 'coef_'+str(kw['CoeffA'][0]).replace('.','p')
+                outenergy = common.fill_path(kw['EnergyOut'], **pars)
+
+                with pd.HDFStore(outenergy, mode='a') as EnOut, up.open(kw['File']) as GenFile:
+                    gen_df = GenFile[kw['FesAlgos'][0]]
+
+                    en_df = dfout.join(gen_df, on='event', how='inner')
+
+                    sub_df = en_df[['event','etanew','phinew','en','genpart_exphi','genpart_exeta','genpart_energy', 'Ncells']].drop_duplicates()
+
+                    EnOut[coef] = sub_df
+
             print('[clustering step with param={}] There were {} events without seeds.'
                   .format(pars['ipar'], empty_seeds))
 

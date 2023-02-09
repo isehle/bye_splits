@@ -13,6 +13,9 @@ import os
 import numpy as np
 import pandas as pd
 
+import re
+from copy import copy, deepcopy
+
 def binConv(vals, dist, amin):
     """
     Converts bin indexes back to values (central values in the bin).
@@ -126,3 +129,76 @@ def tc_base_selection(df, region, pos_endcap, range_rz):
 
     df, subdetCond = get_detector_region_mask(df, region)
     return df, subdetCond
+
+def transform(nested_list):
+    regular_list=[]
+    for ele in nested_list:
+        if type(ele) is list:
+            regular_list.append(ele)
+        else:
+            regular_list.append([ele])
+    return regular_list
+
+class FileDict:
+    def __init__(self, pars, file):
+        self.pars = pars
+        self.file = file
+        self.init_pars = {'opt': copy(pars.opt_kw),
+                          'fill': copy(pars.fill_kw),
+                          'smooth': copy(pars.smooth_kw),
+                          'seed': copy(pars.seed_kw),
+                          'cluster': copy(pars.cluster_kw),
+                          'validation': copy(pars.validation_kw),
+                          'energy': copy(pars.energy_kw)}
+        self.addit = os.path.basename(self.file).replace(".root", "")
+        self.file_addit = lambda x: f"{x}_{self.addit}"
+
+    def get_opt_pars(self):
+        opt_kw = deepcopy(self.init_pars['opt'])
+        opt_kw['InFile'] = f"{self.file}.hdf5"
+        for key in opt_kw.keys():
+            if key != 'InFile' and key not in params.base_kw:
+                opt_kw[key] = self.file_addit(self.pars.opt_kw[key])
+        return opt_kw
+
+    def get_fill_pars(self):
+        fill_kw = deepcopy(self.init_pars['fill'])
+        fill_kw['FillIn'] = self.file.replace('.root', '')
+        for key in fill_kw.keys():
+            if key != 'FillIn' and key not in params.base_kw:
+                fill_kw[key] = self.file_addit(self.pars.fill_kw[key])
+        return fill_kw
+
+    def get_smooth_pars(self):
+        smooth_kw = deepcopy(self.init_pars['smooth'])
+        for key in smooth_kw.keys():
+            smooth_kw[key] = self.file_addit(self.pars.smooth_kw[key])
+        return smooth_kw
+
+    def get_seed_pars(self):
+        seed_kw = deepcopy(self.init_pars['seed'])
+        for key in seed_kw.keys():
+            seed_kw[key] = self.file_addit(self.pars.seed_kw[key])
+        return seed_kw
+    
+    def get_cluster_pars(self):
+        cluster_kw = deepcopy(self.init_pars['cluster'])
+        cluster_kw['File'] = self.file
+        for key in cluster_kw.keys():
+            if key != 'File' and key not in params.base_kw:
+                cluster_kw[key] = self.file_addit(self.pars.cluster_kw[key])
+        return cluster_kw
+
+    def get_validation_pars(self):
+        validation_kw = deepcopy(self.init_pars['validation'])
+        for key in validation_kw.keys():
+            validation_kw[key] = self.file_addit(self.pars.validation_kw[key])
+        return validation_kw
+
+    def get_energy_pars(self):
+        energy_kw = deepcopy(self.init_pars['energy'])
+        energy_kw['File'] = self.file
+        for key in energy_kw.keys():
+            if key != 'File' and key not in params.base_kw:
+                energy_kw[key] = self.file_addit(self.pars.energy_kw[key])
+        return energy_kw
