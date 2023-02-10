@@ -29,7 +29,7 @@ assert FLAGS.sel in ('splits_only',) or FLAGS.sel.startswith('above_eta_') or FL
 FLAGS.reg = 'All'
 FLAGS.sel = 'below_eta_2.7'
 
-input_files = params.fill_kw['FillInFiles']
+input_files = params.input_files
 
 dash.register_page(__name__, title='Energy', name='Energy')
 
@@ -65,15 +65,12 @@ def fill_dict_w_mean_norm(key, coef, eta, df, norm, out_dict):
     out_dict[key] = np.append(out_dict[key],mean_energy)    
 
 def write_plot_file(input_files, norm, eta, outfile, pars=vars(FLAGS)):
-    plot_dict = {}
     normed_energies = dict.fromkeys(input_files.keys(),[0.0]) # Initialize at 0 since we only consider coefs[1:] (coefs[0] is an empty dataframe)
-    start = params.energy_kw['EnergyOut']
+
     for key in input_files.keys():
-        plot_dict[key] = [start+re.split('gen_cl3d_tc',file)[1] for file in input_files[key]]
-        plot_dict[key] = [common.fill_path(file,**pars) for file in plot_dict[key]]
         
-        if len(plot_dict[key])==1:
-            with pd.HDFStore(plot_dict[key][0],'r') as File:
+        if len(input_files[key])==1:
+            with pd.HDFStore(input_files[key][0],'r') as File:
                 coef_strs = File.keys()
                 if norm=='max':
                     max = File[coef_strs[-1]].set_index('event').drop(columns=['matches','en_max'])
@@ -82,7 +79,7 @@ def write_plot_file(input_files, norm, eta, outfile, pars=vars(FLAGS)):
                     fill_dict_w_mean_norm(key, coef, eta, df, norm, normed_energies)
 
         else:
-            file_list = [pd.HDFStore(val,'r') for val in plot_dict[key]]
+            file_list = [pd.HDFStore(val,'r') for val in input_files[key]]
             coef_strs = file_list[0].keys()
             if norm=='max':
                 max = pd.concat([file_list[i][coef_strs[-1]].set_index('event').drop(columns=['matches','en_max']) for i in range(len(file_list))])
@@ -107,7 +104,7 @@ def write_plot_file(input_files, norm, eta, outfile, pars=vars(FLAGS)):
     Input("normby", "value"),
     Input("eta_range", "value"))
 
-def plot_norm(normby, eta_range, pars=vars(FLAGS), init_files=input_files, plot_file='normed_distribution'):
+def plot_norm(normby, eta_range, init_files=input_files, plot_file='normed_distribution'):
     global y_axis_title
 
     if normby=='Energy':
@@ -136,9 +133,13 @@ def plot_norm(normby, eta_range, pars=vars(FLAGS), init_files=input_files, plot_
     coef_labels= coef_labels[0::5]
 
     fig = make_subplots(rows=1, cols=2, subplot_titles=("Photon", "Pion"))
-
-    en_phot = normed_dist['photon']
-    en_pion = normed_dist['pion']
+    
+    try:
+        en_phot = normed_dist['photon']
+        en_pion = normed_dist['pion']
+    except:
+        en_phot = normed_dist['photons']
+        en_pion = normed_dist['pions']
 
     fig.add_trace(go.Scatter(x=coefs, y=en_phot, name='Photon'), row=1, col=1)
     fig.add_trace(go.Scatter(x=coefs, y=en_pion, name='Pion'), row=1, col=2)

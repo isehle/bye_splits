@@ -10,7 +10,7 @@ import re
 import pandas as pd
 import h5py
 
-parent_dir = '/eos/user/i/iehle/data/PU0/'
+parent_dir = os.path.abspath(__file__ + 4 * '/..')
 sys.path.insert(0, parent_dir)
 
 import argparse
@@ -26,7 +26,7 @@ assert FLAGS.sel in ('splits_only',) or FLAGS.sel.startswith('above_eta_') or FL
 FLAGS.reg = 'All'
 FLAGS.sel = 'below_eta_2.7'
 
-input_files = params.fill_kw['FillInFiles']
+input_files=params.input_files
 
 # Find the element of a list containing strings ['coef_{float_1}', 'coef_{float_2}', ...] which is closest to some float_i
 def_k = 0.0
@@ -54,7 +54,8 @@ def effrms(data, c=0.68):
     containing a fraction 'c' of items in a 1D array.
     """
     out = {}
-    x = np.sort(data, kind='mergesort')
+    new_series = data.dropna()
+    x = np.sort(new_series, kind='mergesort')
     m = int(c *len(x)) + 1
     out = [np.min(x[m:] - x[:-m]) / 2.0]
 
@@ -72,33 +73,30 @@ def get_keys(init_files, pars):
 
     start = params.energy_kw['EnergyOut']
 
-    file_name = start+re.split('gen_cl3d_tc',init_files['photon'][0])[1]
-    file_path = common.fill_path(file_name, **pars)
+    #file_name = start+re.split('gen_cl3d_tc',init_files['photon'][0])[1]
+    #file_path = common.fill_path(file_name, **pars)
+
+    file_path = init_files['photons'][0]
     
     with pd.HDFStore(file_path, 'r') as File:
         keys = File.keys()
 
     return keys
 
-def get_dfs(init_files, coef, pars):
-
-    file_dict = {}
-    start = params.energy_kw['EnergyOut']
+def get_dfs(init_files, coef):
     df_dict = dict.fromkeys(init_files.keys(),[0.0])
 
     for key in init_files.keys():
-        file_dict[key] = [start+re.split('gen_cl3d_tc',file)[1] for file in init_files[key]]
-        file_dict[key] = [common.fill_path(file,**pars) for file in file_dict[key]]
-        if len(file_dict[key])==1:
+        if len(init_files[key])==1:
 
-            File = pd.HDFStore(file_dict[key][0],'r')
-
+            File = pd.HDFStore(init_files[key][0],'r')
+            
             if not isinstance(coef, str):
                 coef = get_str(coef, File)
             
             df = File[coef]
         else:
-            file_list = [pd.HDFStore(val,'r') for val in file_dict[key]]
+            file_list = [pd.HDFStore(val,'r') for val in init_files[key]]
             if not isinstance(coef, str):
                 coef = get_str(coef, file_list[0])
             df_list = [file_list[i][coef] for i in range(len(file_list))]
@@ -109,10 +107,13 @@ def get_dfs(init_files, coef, pars):
 
 def get_rms(coef, eta_range, normby, rms_dict=None, rms_eff_dict=None, binned_rms=True):
 
-    dfs_by_particle = get_dfs(input_files, coef, vars(FLAGS))
-
-    phot_df = dfs_by_particle['photon']
-    pion_df = dfs_by_particle['pion']
+    dfs_by_particle = get_dfs(input_files, coef)
+    try:
+        phot_df = dfs_by_particle['photon']
+        pion_df = dfs_by_particle['pion']
+    except:
+        phot_df = dfs_by_particle['photons']
+        pion_df = dfs_by_particle['pions']
 
     if normby=='Energy':
         phot_df['normed_energies'] = phot_df['en']/phot_df['genpart_energy']
@@ -141,8 +142,7 @@ def get_rms(coef, eta_range, normby, rms_dict=None, rms_eff_dict=None, binned_rm
 
     if binned_rms:
         return phot_df, pion_df, {'Photon': phot_rms, 'Pion': pion_rms}, {'Photon': phot_eff_rms, 'Pion': pion_eff_rms}
-
-    if not binned_rms:
+    else:
         rms_dict['Photon'] = np.append(rms_dict['Photon'], phot_rms)
         rms_eff_dict['Photon'] = np.append(rms_eff_dict['Photon'], phot_eff_rms)
 
@@ -258,7 +258,6 @@ def write_rms_file(coefs, eta, norm, filename):
 
     for coef in coefs[1:]:
         get_rms(coef, eta, norm, rms_by_part, rms_eff_by_part, binned_rms=False)
-    
     with pd.HDFStore(filename, 'w') as glob_rms_file:
         glob_rms_file.put('RMS', pd.DataFrame.from_dict(rms_by_part))
         glob_rms_file.put('Eff_RMS', pd.DataFrame.from_dict(rms_eff_by_part))
@@ -293,7 +292,6 @@ def glob_rms(eta_range, normby, file='rms_and_eff.hdf5'):
 
     fig.add_trace(go.Scatter(x=nice_coefs, y=rms_by_part['Photon'], name='RMS', line_color='purple'), row=1, col=1)
     fig.add_trace(go.Scatter(x=nice_coefs, y=rms_eff_by_part['Photon'], name='Eff-RMS', line_color='purple', mode='markers'), row=1, col=1)
-    
     
     fig.add_trace(go.Scatter(x=nice_coefs, y=rms_by_part['Pion'], name='RMS', line_color='red'), row=1, col=2)
     fig.add_trace(go.Scatter(x=nice_coefs, y=rms_eff_by_part['Pion'], name='Eff-RMS', line_color='red', mode='markers'), row=1, col=2)

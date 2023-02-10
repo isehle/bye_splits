@@ -9,6 +9,7 @@ parent_dir = os.path.abspath(__file__ + 3 * '/..')
 sys.path.insert(0, parent_dir)
 
 import numpy as np
+import pandas as pd
 
 user = 'ehle'
 NbinsRz = 42
@@ -18,12 +19,12 @@ MaxROverZ = 0.58
 MinPhi = -np.pi
 MaxPhi = +np.pi
 PileUp = "PU0"
-local = True
+local = False
 if local:   
     base_dir = "/grid_mnt/vol_home/llr/cms/ehle/Repos/bye_splits_final/"
 else:
     base_dir = "/eos/user/i/iehle/"
-DataFolder = 'data/{}/{}'.format(PileUp,particle)
+DataFolder = 'data/{}/'.format(PileUp)
 LocalDataFolder = 'data/new_algos'
 EOSDataFolder = '/eos/user/b/bfontana/FPGAs/new_algos/'
 
@@ -70,6 +71,17 @@ if user=='ehle':
     base_kw['DataFolder'] = f"data/{pile_up}/{particle}"
     base_kw['FesAlgos'] = ['FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple/HGCalTriggerNtuple']
     base_kw['BasePath'] = f"{base_dir}{base_kw['DataFolder']}"
+input_files = {'photons':[], 'pions': []}
+input_directory = base_kw['BasePath']
+for filename in os.listdir(input_directory):
+    if filename.startswith('energy_out'):
+        path = os.path.join(input_directory, filename)
+        with pd.HDFStore(path, "r") as File:
+            if len(File.keys())>0:
+                if 'photon' in filename:
+                    input_files['photons'].append(path)
+                else:
+                    input_files['pions'].append(path)
 
 def set_dictionary(adict):
     adict.update(base_kw)

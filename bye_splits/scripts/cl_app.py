@@ -1,10 +1,17 @@
 #!/usr/bin/env python
+import os
+import sys
+
+import pandas as pd
 
 from dash import Dash, html, dcc
 import dash
 
 import dash_bootstrap_components as dbc
 from dash_bootstrap_templates import load_figure_template
+
+parent_dir = os.path.abspath(__file__ + 3 * '/..')
+sys.path.insert(0, parent_dir)
 
 app = Dash(__name__, use_pages=True, external_stylesheets=[dbc.themes.SOLAR])
 load_figure_template('SOLAR')
