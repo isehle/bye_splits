@@ -10,6 +10,7 @@ sys.path.insert(0, parent_dir)
 
 import numpy as np
 
+user = 'ehle'
 NbinsRz = 42
 NbinsPhi = 216
 MinROverZ = 0.076
@@ -47,6 +48,18 @@ base_kw = {
 
     'Placeholder': np.nan,
 }
+
+if user=='ehle':
+    local = False
+    pile_up = "PU0"
+    particle = "photon"
+    if local:
+        base_dir = "/grid_mnt/vol_home/llr/cms/ehle/git/bye_splits_final/"
+    else:
+        base_dir = "/eos/user/i/iehle/"
+    base_kw['DataFolder'] = f"data/{pile_up}/{particle}"
+    base_kw['FesAlgos'] = ['FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple/HGCalTriggerNtuple']
+    base_kw['BasePath'] = f"{base_dir}{base_kw['DataFolder']}"
 
 def set_dictionary(adict):
     adict.update(base_kw)
