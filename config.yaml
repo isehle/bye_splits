@@ -1,7 +1,10 @@
 io:
-  dirphotons: hgcalTriggerNtuplizer
+  #dirphotons: hgcalTriggerNtuplizer
+  #treephotons: HGCalTriggerNtuple
+  #filephotons: /data_CMS/cms/alves/L1HGCAL/skim_small_TEST_module_TEST_BIG_Thresh0.root
+  dirphotons: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
   treephotons: HGCalTriggerNtuple
-  filephotons: /data_CMS/cms/alves/L1HGCAL/skim_small_TEST_module_TEST_BIG_Thresh0.root
+  filephotons: /data_CMS/cms/ehle/L1HGCAL/PU200/photons/new_skims/skim_tightTC_hadd.root
   direlectrons: hgcalTriggerNtuplizer
   treeelectrons: HGCalTriggerNtuple
   fileelectrons: /eos/user/i/iehle/data/PU0/electrons/skim_electrons_0PU_bc_stc_hadd.root
@@ -120,7 +123,7 @@ clusterStudies:
   reinit: False
   clusterSizeBaseName: cluster_size
   coeffs: [0.0, 0.05, 50]
-  nevents: 100
+  nevents: -1
   pileUp: False
   tree: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple/HGCalTriggerNtuple
   local: False

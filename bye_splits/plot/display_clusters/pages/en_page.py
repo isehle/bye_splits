@@ -45,7 +45,7 @@ pile_up_dir = "PU0" if not cfg["clusterStudies"]["pileUp"] else "PU200"
 if cfg["clusterStudies"]["local"]:
     data_dir = cfg["clusterStudies"]["localDir"]
 else:
-    data_dir = params.EOSStorage(FLAGS.user, cfg["dirs"]["dataFolder"])
+    data_dir = params.EOSStorage(FLAGS.user, cfg["clusterStudies"]["dataFolder"])
 
 input_files = cl_helpers.get_output_files(cfg)
 

@@ -1,6 +1,6 @@
 # coding: utf-8
 
-_all_ = ['baseline_selection', 'EventDataParticle']
+_all_ = ["baseline_selection", "EventDataParticle"]
 
 import os
 import sys
@@ -20,6 +20,7 @@ from data_handle.geometry import GeometryData
 from data_handle.event import EventData
 from data_handle.data_input import InputData
 
+
 def baseline_selection(df_gen, df_cl, sel, **kw):
     data = pd.merge(left=df_gen, right=df_cl, how='inner', on='event')
     data = data[(data.gen_eta>kw['EtaMin']) & (data.gen_eta<kw['EtaMax'])]
@@ -27,53 +28,59 @@ def baseline_selection(df_gen, df_cl, sel, **kw):
     if sel.startswith('above_eta_'):
         data = data[data.gen_eta > float(sel.split('above_eta_')[1])]
         return data
-    
+
     with common.SupressSettingWithCopyWarning():
-        data['enres'] = data.cl3d_en - data.gen_en
+        data["enres"] = data.cl3d_en - data.gen_en
         data.enres /= data.gen_en
 
-    nansel = pd.isna(data['enres'])
+    nansel = pd.isna(data["enres"])
     nandf = data[nansel]
-    nandf['enres'] = 1.1
+    nandf["enres"] = 1.1
     data = data[~nansel]
-    data = pd.concat([data,nandf], sort=False)
-        
-    if sel == 'splits_only':
+    data = pd.concat([data, nandf], sort=False)
+
+    if sel == "splits_only":
         # select events with splitted clusters (enres < energy cut)
         # if an event has at least one cluster satisfying the enres condition,
         # all of its clusters are kept (this eases comparison with CMSSW)
-        evgrp = data.groupby(['event'], sort=False)
+        evgrp = data.groupby(["event"], sort=False)
         multiplicity = evgrp.size()
-        bad_res = (evgrp.apply(lambda grp: np.any(grp['enres'] < kw['EnResSplits']))).values
+        bad_res = (
+            evgrp.apply(lambda grp: np.any(grp["enres"] < kw["EnResSplits"]))
+        ).values
         bad_res_mask = np.repeat(bad_res, multiplicity.values)
         data = data[bad_res_mask]
-  
-    elif sel == 'no_splits':
-        data = data[(data.gen_eta > kw['EtaMinStrict']) &
-                    (data.gen_eta < kw['EtaMaxStrict'])]
-        evgrp = data.groupby(['event'], sort=False)
+
+    elif sel == "no_splits":
+        data = data[
+            (data.gen_eta > kw["EtaMinStrict"]) & (data.gen_eta < kw["EtaMaxStrict"])
+        ]
+        evgrp = data.groupby(["event"], sort=False)
         multiplicity = evgrp.size()
-        good_res = (evgrp.apply(lambda grp: np.all(grp['enres'] > kw['EnResNoSplits']))).values
+        good_res = (
+            evgrp.apply(lambda grp: np.all(grp["enres"] > kw["EnResNoSplits"]))
+        ).values
         good_res_mask = np.repeat(good_res, multiplicity.values)
         data = data[good_res_mask]
-        
-    elif sel == 'all':
+
+    elif sel == "all":
         pass
-    
+
     else:
-        m = 'Selection {} is not supported.'.format(sel)
+        m = "Selection {} is not supported.".format(sel)
         raise ValueError(m)
 
     return data
 
-def get_data_reco_chain_start(nevents=500, reprocess=False, tag='chain'):
+
+def get_data_reco_chain_start(nevents=500, reprocess=False, tag="chain"):
     """Access event data."""
     data_part_opt = dict(tag=tag, reprocess=reprocess, debug=True)
     data_particle = EventDataParticle(**data_part_opt)
     ds_all, events = data_particle.provide_random_events(n=nevents, seed=42)
     # ds_all = data_particle.provide_events(events=[170004, 170015, 170017, 170014])
 
-    tc_keep = {
+    """tc_keep = {
         "event": "event",
         "good_tc_waferu": "tc_wu",
         "good_tc_waferv": "tc_wv",
@@ -89,6 +96,23 @@ def get_data_reco_chain_start(nevents=500, reprocess=False, tag='chain'):
         "good_tc_eta": "tc_eta",
         "good_tc_phi": "tc_phi",
         "good_tc_cluster_id": "tc_cluster_id",
+    }"""
+
+    tc_keep = {
+        "event": "event",
+        "tc_waferu_cut": "tc_wu",
+        "tc_waferv_cut": "tc_wv",
+        "tc_cellu_cut": "tc_cu",
+        "tc_cellv_cut": "tc_cv",
+        "tc_layer_cut": "tc_layer",
+        "tc_pt_cut": "tc_pt",
+        "tc_mipPt_cut": "tc_mipPt",
+        "tc_x_cut": "tc_x",
+        "tc_y_cut": "tc_y",
+        "tc_z_cut": "tc_z",
+        "tc_eta_cut": "tc_eta",
+        "tc_phi_cut": "tc_phi",
+        "tc_multicluster_id_cut": "tc_cluster_id",
     }
 
     ds_tc = ds_all["tc"]
@@ -116,6 +140,7 @@ def get_data_reco_chain_start(nevents=500, reprocess=False, tag='chain'):
 
     return ds_gen, ds_cl, ds_tc
 
+
 def EventDataParticle(tag, reprocess, logger=None, debug=False, particles=None):
     """Factory for EventData instances of different particle types"""
     with open(params.CfgPath, "r") as afile:
@@ -133,6 +158,5 @@ def EventDataParticle(tag, reprocess, logger=None, debug=False, particles=None):
 
     tag = particles + "_" + tag
     tag += "_debug" * debug
-
 
     return EventData(indata, tag, defevents, reprocess, logger)

@@ -162,7 +162,7 @@ def get_output_files(cfg):
 
     output_files = {"photons": [], "pions": [], "electrons": []}
     template = os.path.basename(
-        common.fill_path(cfg["clusterStudies"]["fileBaseName"], **vars(FLAGS))
+        common.fill_path(cfg["clusterStudies"]["clusterSizeBaseName"], **vars(FLAGS))
     )
     template = re.split("_", template)
     if cfg["clusterStudies"]["local"]:

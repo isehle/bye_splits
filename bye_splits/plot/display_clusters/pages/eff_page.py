@@ -24,10 +24,11 @@ FLAGS = parser.parse_args()
 with open(params.CfgPath, "r") as afile:
     cfg = yaml.safe_load(afile)
 
-pile_up_dir = "PU0" if not cfg["clusterSize"]["pileUp"] else "PU200"
+# pile_up_dir = "PU0" if not cfg["clusterSize"]["pileUp"] else "PU200"
+pile_up_dir = "PU0" if not cfg["clusterStudies"]["pileUp"] else "PU200"
 
 if cfg["clusterStudies"]["local"]:
-    data_dir = cfgprod["clusterStudies"]["localDir"]
+    data_dir = cfg["clusterStudies"]["localDir"]
 else:
     data_dir = params.EOSStorage(FLAGS.user, "data/")
 
@@ -217,7 +218,10 @@ def global_effs(eta_range, normby, pileup, file="global_eff.hdf5"):
     filename = "{}_eta_{}_{}_{}".format(normby, eta_range[0], eta_range[1], file)
     filename_user = "{}{}/{}".format(data_dir, pile_up_dir, filename)
     filename_iehle = "{}{}{}/{}".format(
-        cfg["clusterStudies"]["ehleDir"], cfg["clusterStudies"]["dataFolder"], pile_up_dir, filename
+        cfg["clusterStudies"]["ehleDir"],
+        cfg["clusterStudies"]["dataFolder"],
+        pile_up_dir,
+        filename,
     )
 
     if os.path.exists(filename_user):
