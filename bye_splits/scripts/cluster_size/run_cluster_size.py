@@ -12,7 +12,7 @@ import tasks
 from utils import params, common, parsing, cl_helpers
 
 from bye_splits.scripts.iterative_optimization import optimization
-from data_handle.data_handle import get_data_reco_chain_start
+from data_handle.data_process import get_data_reco_chain_start
 
 import csv
 import argparse
