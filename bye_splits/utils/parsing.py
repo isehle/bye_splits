@@ -45,9 +45,3 @@ def add_parameters(parser):
         help="Clustering algorithm applied.",
     )
     parser.add_argument("--user", type=str, help="lxplus username.")
-    parser.add_argument(
-        "--cluster_studies",
-        type=bool,
-        help="Read+write files for cluster size studies.",
-        default=False,
-    )

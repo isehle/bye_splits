@@ -61,12 +61,13 @@ def combine_files_by_coef(in_dir, out_path):
 def cluster_size(pars, cfg):
     df_out = None
     nevents = cfg["clusterStudies"]["nevents"]
+    reprocess = cfg["clusterStudies"]["reprocess"]
 
     cluster_d = params.read_task_params("cluster")
 
     if cfg["clusterStudies"]["reinit"]:
         df_gen, df_cl, df_tc = get_data_reco_chain_start(
-            nevents=nevents, reprocess=True
+            nevents=nevents, reprocess=reprocess
         )
 
         print("There are {} events in the input.".format(df_gen.shape[0]))
@@ -103,7 +104,7 @@ def cluster_size(pars, cfg):
 
         with pd.HDFStore(cl_size_out, mode="a") as clSizeOut:
             df_gen, _, _ = get_data_reco_chain_start(
-                "cluster_size", nevents=nevents, reprocess=False
+                nevents=nevents, reprocess=False
             )
             coef_keys = clSizeOut.keys()
             for coef in coef_keys[1:]:

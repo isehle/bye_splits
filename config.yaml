@@ -4,7 +4,7 @@ io:
   #filephotons: /data_CMS/cms/alves/L1HGCAL/skim_small_TEST_module_TEST_BIG_Thresh0.root
   dirphotons: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
   treephotons: HGCalTriggerNtuple
-  filephotons: /data_CMS/cms/ehle/L1HGCAL/PU200/photons/new_skims/skim_tightTC_hadd.root
+  filephotons: /data_CMS/cms/ehle/L1HGCAL/PU200/photons/new_skims/skim_tightTC_dRxy_hadd.root
   direlectrons: hgcalTriggerNtuplizer
   treeelectrons: HGCalTriggerNtuple
   fileelectrons: /eos/user/i/iehle/data/PU0/electrons/skim_electrons_0PU_bc_stc_hadd.root
@@ -120,13 +120,12 @@ clusterStudies:
   localDir: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/
   ehleDir: /eos/user/i/iehle/
   dataFolder: data/
-  reinit: False
+  reprocess: False # Process the ROOT file or read the .parquet if already processed
+  reinit: True # Run (fill, smooth, seed) tasks
   clusterSizeBaseName: cluster_size
   coeffs: [0.0, 0.05, 50]
   nevents: -1
-  pileUp: False
   tree: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple/HGCalTriggerNtuple
-  local: False
 
 base:
   NbinsRz: 42

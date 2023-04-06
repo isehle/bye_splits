@@ -80,7 +80,7 @@ def get_data_reco_chain_start(nevents=500, reprocess=False, tag="chain"):
     ds_all, events = data_particle.provide_random_events(n=nevents, seed=42)
     # ds_all = data_particle.provide_events(events=[170004, 170015, 170017, 170014])
 
-    """tc_keep = {
+    tc_keep = {
         "event": "event",
         "good_tc_waferu": "tc_wu",
         "good_tc_waferv": "tc_wv",
@@ -95,24 +95,7 @@ def get_data_reco_chain_start(nevents=500, reprocess=False, tag="chain"):
         "good_tc_z": "tc_z",
         "good_tc_eta": "tc_eta",
         "good_tc_phi": "tc_phi",
-        "good_tc_cluster_id": "tc_cluster_id",
-    }"""
-
-    tc_keep = {
-        "event": "event",
-        "tc_waferu_cut": "tc_wu",
-        "tc_waferv_cut": "tc_wv",
-        "tc_cellu_cut": "tc_cu",
-        "tc_cellv_cut": "tc_cv",
-        "tc_layer_cut": "tc_layer",
-        "tc_pt_cut": "tc_pt",
-        "tc_mipPt_cut": "tc_mipPt",
-        "tc_x_cut": "tc_x",
-        "tc_y_cut": "tc_y",
-        "tc_z_cut": "tc_z",
-        "tc_eta_cut": "tc_eta",
-        "tc_phi_cut": "tc_phi",
-        "tc_multicluster_id_cut": "tc_cluster_id",
+        "good_tc_multicluster_id": "tc_multicluster_id",
     }
 
     ds_tc = ds_all["tc"]
