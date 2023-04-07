@@ -14,6 +14,7 @@ import os
 import yaml
 import numpy as np
 import pandas as pd
+import re
 
 
 def binConv(vals, dist, amin):
@@ -117,3 +118,27 @@ def print_histogram(arr):
             else:
                 print("X", end="|")
         print()
+
+# Accepts a template for a full path to a file and increments the version
+def increment_version(file_path):
+    dir, file = os.path.split(file_path)
+    base, ext = os.path.splitext(file)
+    i = 0
+    file_path = "{}/{}_v{}{}".format(dir, base, i, ext)
+    while os.path.exists(file_path):
+        i += 1
+        file_path = "{}/{}_v{}{}".format(dir, base, i, ext)
+    return file_path
+
+
+# Grab the most recent version of the file corresponding to the template file_path
+def grab_most_recent(file_path):
+    dir, file = os.path.split(file_path)
+    base, ext = os.path.splitext(file)
+    files = os.listdir(dir)
+    version_pattern = re.compile("{}_v(\\d+)\\{}".format(base, ext))
+    matches = [version_pattern.search(file) for file in files]
+    matches = [match for match in matches if not match is None]
+    most_recent = max([int(match.group(1)) for match in matches])
+    file_path = dir + "/" + base + "_v" + str(most_recent) + ext
+    return file_path
