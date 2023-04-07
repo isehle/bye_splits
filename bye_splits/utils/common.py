@@ -144,7 +144,10 @@ def grab_most_recent(file_path, return_all=False):
         most_recent = max(matches)
         file_path = dir + "/" + base + "_v" + str(most_recent) + ext
         file_paths = [dir + "/" + base + "_v" + str(f) + ext for f in matches]
-        return file_path if not return_all else file_paths
+        if not return_all:            
+            return file_path
+        else:
+            return file_paths
     else:
         return None
 
@@ -164,6 +167,7 @@ def write_file_version(template, version):
         job_file.writelines(version)
     st = os.stat(file_name)
     os.chmod(file_name, st.st_mode | 0o744)
+    return file_name
 
 def conditional_write(file_versions, file_template, current_version):
     """
@@ -180,10 +184,12 @@ def conditional_write(file_versions, file_template, current_version):
                 continue
             else:
                 identical_version = True
+                file_path = grab_most_recent(file_template)
                 break
         if not identical_version:
-            write_file_version(file_template, current_version)
+            file_path = write_file_version(file_template, current_version)
     
     else:
-        write_file_version(file_template, current_version)
+        file_path = write_file_version(file_template, current_version)
+    return file_path
 

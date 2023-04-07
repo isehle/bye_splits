@@ -95,7 +95,7 @@ class CondJobBase(JobBatches):
             current_version.append("python {} --batch_file $1 --user {}".format(self.script, self.user))
 
         # Write the file only if an identical file doesn't already exist
-        common.conditional_write(submit_file_versions, submit_file_name_template, current_version)
+        _ = common.conditional_write(submit_file_versions, submit_file_name_template, current_version)
 
     def prepare_multi_job_condor(self):
         log_dir = "{}logs/".format(self.particle_dir)
@@ -134,8 +134,8 @@ class CondJobBase(JobBatches):
             current_version.append(")")
 
         # Write the file only if an identical file doesn't already exist
-        common.conditional_write(job_file_versions, job_file_name_template, current_version)
-
+        global submission_file # Save for a consistency check when launching
+        submission_file = common.conditional_write(job_file_versions, job_file_name_template, current_version)
 
 class CondJob(CondJobBase):
     def __init__(self, particle, config):
@@ -164,7 +164,7 @@ class CondJob(CondJobBase):
         self.prepare_multi_job_condor()
 
 
-    def launch_job(self):
+    def launch_jobs(self):
 
         if self.local == True:
             machine = "local"
@@ -185,6 +185,9 @@ class CondJob(CondJobBase):
         sub_args = []
         sub_file_name = "{}jobs/{}.sub".format(self.particle_dir, script_basename)
         sub_file_name = common.grab_most_recent(sub_file_name)
+
+        assert(sub_file_name == submission_file) # Consisistency check
+
         sub_args.append(sub_file_name)
 
         if self.local:
@@ -203,4 +206,4 @@ if __name__ == "__main__":
     for particle in ("photons", "electrons"):
         job = CondJob(particle, config)
         job.prepare_jobs()
-        job.launch_job()
+        job.launch_jobs()
