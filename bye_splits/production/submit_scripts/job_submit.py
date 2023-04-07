@@ -10,7 +10,6 @@ sys.path.insert(0, parent_dir)
 from bye_splits.utils import params, common
 
 import subprocess
-import re
 import yaml
 
 # Read particle specific variables from the YAML file
@@ -24,22 +23,21 @@ class JobBatches:
     def setup_batches(self):
 
         my_batches = lambda files, files_per_batch: [files[i: i + files_per_batch] for i in range(0, len(files), files_per_batch)]
-        strip_trail = lambda batches: [[file.rstrip() for file in batch] for batch in batches]
 
         read_dir = self.config["job"]["read_dir"]
         files = particle_var(self.particle, "files")
         files_per_batch = particle_var(self.particle, "files_per_batch")
+        
         if not read_dir:
-            with open(files, "r") as File:
-                lines = File.readlines()
-                # readlines() keeps the explicit "/n" character, strip_trail removes this
-                batches = strip_trail(my_batches(lines, files_per_batch))
+            with open(files, "r") as file:
+                paths = file.read().splitlines()
         else:
             part_submit_dir = particle_var(self.particle, "submit_dir") + "ntuples/"
             paths = [
                 "{}{}".format(part_submit_dir, file) for file in os.listdir(part_submit_dir) if file.startswith("ntuple")
             ]
-            batches = my_batches(paths, files_per_batch)
+        
+        batches = my_batches(paths, files_per_batch)
 
         return batches
     
@@ -48,6 +46,7 @@ class CondJobBase(JobBatches):
         super().__init__(particle, config)
         self.particle_dir = particle_var(self.particle, "submit_dir")
         self.script = config["job"]["script"]
+        self.require_args = config["job"]["require_args"]
         self.queue = config["job"]["queue"]
         self.proxy = config["job"]["proxy"]
         self.local = config["job"]["local"]
@@ -81,22 +80,22 @@ class CondJobBase(JobBatches):
         script_basename = os.path.basename(self.script).replace(".sh", "").replace(".py", "")
 
         submit_file_name_template = "{}{}_submit.sh".format(sub_dir, script_basename)
+        submit_file_versions = common.grab_most_recent(submit_file_name_template, return_all=True)
 
-        submit_file_name = common.increment_version(submit_file_name_template)
-        with open(submit_file_name, "w") as submit_file:
-            submit_file.write("#!/usr/bin/env bash\n")
-            submit_file.write("workdir={}/bye_splits/production/submit_scripts\n".format(parent_dir))
-            submit_file.write("cd $workdir\n")
-            submit_file.write("export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch\n")
-            submit_file.write("export SITECONFIG_PATH=$VO_CMS_SW_DIR/SITECONF/T2_FR_GRIF_LLR/GRIF-LLR/\n")
-            submit_file.write("source $VO_CMS_SW_DIR/cmsset_default.sh\n")
-            if script_ext == ".sh":
-                submit_file.write("bash {} $1".format(self.script))
-            elif script_ext == ".py":
-                submit_file.write("python {} --batch_file $1 --user {}".format(self.script, self.user))
-        st = os.stat(submit_file_name)
-        os.chmod(submit_file_name, st.st_mode | 0o744)
+        current_version = []
+        current_version.append("#!/usr/bin/env bash\n")
+        current_version.append("workdir={}/bye_splits/production/submit_scripts\n".format(parent_dir))
+        current_version.append("cd $workdir\n")
+        current_version.append("export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch\n")
+        current_version.append("export SITECONFIG_PATH=$VO_CMS_SW_DIR/SITECONF/T2_FR_GRIF_LLR/GRIF-LLR/\n")
+        current_version.append("source $VO_CMS_SW_DIR/cmsset_default.sh\n")
+        if script_ext == ".sh":
+            current_version.append("bash {} $1".format(self.script)) if self.require_args else current_version.append("bash {}".format(self.script))
+        elif script_ext == ".py":
+            current_version.append("python {} --batch_file $1 --user {}".format(self.script, self.user))
 
+        # Write the file only if an identical file doesn't already exist
+        common.conditional_write(submit_file_versions, submit_file_name_template, current_version)
 
     def prepare_multi_job_condor(self):
         log_dir = "{}logs/".format(self.particle_dir)
@@ -112,29 +111,30 @@ class CondJobBase(JobBatches):
         job_file_name_template = "{}jobs/{}.sub".format(self.particle_dir, script_basename)
 
         sub_file = common.grab_most_recent(sub_file)
-        job_file_name = common.increment_version(job_file_name_template)
 
-        if os.path.exists(job_file_name):
-            os.remove(job_file_name)
-        with open(job_file_name, "w") as job_file:
-            job_file.write("executable = {}\n".format(sub_file))
-            job_file.write("Universe              = vanilla\n")
-            job_file.write("Arguments             = $(filename)\n")
-            job_file.write("output = {}{}_C$(Cluster)P$(Process).out\n".format(log_dir, script_basename))
-            job_file.write("error = {}{}_C$(Cluster)P$(Process).err\n".format(log_dir, script_basename))
-            job_file.write("log = {}{}_C$(Cluster)P$(Process).log\n".format(log_dir, script_basename))
-            job_file.write("getenv                = true\n")
-            job_file.write("T3Queue = {}\n".format(self.queue))
-            job_file.write("WNTag                 = el7\n")
-            job_file.write('+SingularityCmd       = ""\n')
-            job_file.write("include: /opt/exp_soft/cms/t3/t3queue |\n")
-            job_file.write("queue filename from (\n")
+        job_file_versions = common.grab_most_recent(job_file_name_template, return_all=True)
+
+        current_version = []
+        current_version.append("executable = {}\n".format(sub_file))
+        current_version.append("Universe              = vanilla\n")
+        if self.require_args:
+            current_version.append("Arguments             = $(filename)\n")
+        current_version.append("output = {}{}_C$(Cluster)P$(Process).out\n".format(log_dir, script_basename))
+        current_version.append("error = {}{}_C$(Cluster)P$(Process).err\n".format(log_dir, script_basename))
+        current_version.append("log = {}{}_C$(Cluster)P$(Process).log\n".format(log_dir, script_basename))
+        current_version.append("getenv                = true\n")
+        current_version.append("T3Queue = {}\n".format(self.queue))
+        current_version.append("WNTag                 = el7\n")
+        current_version.append('+SingularityCmd       = ""\n')
+        current_version.append("include: /opt/exp_soft/cms/t3/t3queue |\n")
+        if self.require_args:
+            current_version.append("queue filename from (\n")
             for file in batch_files:
-                job_file.write("{}{}\n".format(batch_script_dir, file))
-            job_file.write(")")
+                current_version.append("{}{}\n".format(batch_script_dir, file))
+            current_version.append(")")
 
-        st = os.stat(job_file_name)
-        os.chmod(job_file_name, st.st_mode | 0o744)
+        # Write the file only if an identical file doesn't already exist
+        common.conditional_write(job_file_versions, job_file_name_template, current_version)
 
 
 class CondJob(CondJobBase):

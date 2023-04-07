@@ -46,19 +46,20 @@ job:
   proxy: ~/.t3/proxy.cert
   queue: short
   local: False
-  script: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/bye_splits/production/submit_scripts/skim_pu_multicluster.sh
-  read_dir: True # If False, read the file paths stored on the .txt files below
+  script: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/bye_splits/production/submit_scripts/condor_cluster_size.sh
+  require_args: True
+  read_dir: False # If False, read the file paths stored on the .txt files below
   photons:
     submit_dir: /data_CMS/cms/ehle/L1HGCAL/PU200/photons/
-    files: /data_CMS/cms/ehle/L1HGCAL/PU200/photons/photon_ntuples.txt
+    files: /data_CMS/cms/ehle/L1HGCAL/PU200/coefs.txt
     files_per_batch: 10
   electrons:
     submit_dir: /data_CMS/cms/ehle/L1HGCAL/PU200/electrons/
-    files: /data_CMS/cms/ehle/L1HGCAL/PU200/electrons/electron_ntuples.txt
+    files: /data_CMS/cms/ehle/L1HGCAL/PU200/coefs.txt
     files_per_batch: 10
   pions:
     submit_dir: /data_CMS/cms/ehle/L1HGCAL/PU200/pions/
-    files: /data_CMS/cms/ehle/L1HGCAL/PU200/pions/pion_ntuples.txt
+    files: /data_CMS/cms/ehle/L1HGCAL/PU200/coefs.txt
     files_per_batch: 10
 
 varEvents:
@@ -120,10 +121,10 @@ clusterStudies:
   localDir: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/
   ehleDir: /eos/user/i/iehle/
   dataFolder: data/
-  reprocess: False # Process the ROOT file or read the .parquet if already processed
+  reprocess: False # {True: Process the ROOT file, False: read the .parquet if already processed}
   reinit: True # Run (fill, smooth, seed) tasks
   clusterSizeBaseName: cluster_size
-  coeffs: [0.0, 0.05, 50]
+  coeffs: [0.0, 0.05, 50] # (Min, Max, Total)
   nevents: -1
   tree: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple/HGCalTriggerNtuple
 

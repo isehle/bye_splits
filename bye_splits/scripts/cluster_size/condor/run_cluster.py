@@ -32,7 +32,7 @@ def cluster_coef(pars, cfg):
     cluster_d["ClusterOutPlot"] = cl_size_coef
     cluster_d["CoeffA"] = [coef, 0] * 50
 
-    nevents_end = tasks.cluster.cluster(pars, **cluster_d)
+    nevents_end = tasks.cluster.cluster_default(pars, **cluster_d)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
