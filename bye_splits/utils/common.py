@@ -193,3 +193,21 @@ def conditional_write(file_versions, file_template, current_version):
         file_path = write_file_version(file_template, current_version)
     return file_path
 
+def remove_nans(arrs):
+    """
+    Removes NaN values from arrays which contain them, and corresponding values
+    in other arrays at the same indices as those NaN values.
+    """
+    # Find indices of NaN values in all arrays
+    nan_indices = np.isnan(arrs).any(axis=0)
+
+    # Remove NaN values from the arrays
+    cleaned_arrays = [arr[~nan_indices] for arr in arrs]
+
+    length = np.array([len(cleaned_arrays[0])==len(arr) for arr in cleaned_arrays]).all()
+
+    # Assert that all cleaned arrays have the same length
+    assert(length)
+
+    return cleaned_arrays
+
