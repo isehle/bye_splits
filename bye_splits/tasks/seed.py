@@ -15,6 +15,8 @@ import numpy as np
 import h5py
 import yaml
 
+import yaml
+
 def validation(mipPts, event, infile, outfile, nbinsrz, nbinsphi):
     """Compares all values of 2d histogram between local and CMSSW versions."""
     with open(infile, 'w') as flocal, open(outfile, 'r') as fremote:
