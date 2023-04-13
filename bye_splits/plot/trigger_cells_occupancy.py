@@ -17,7 +17,7 @@ import sys
 parent_dir = os.path.abspath(__file__ + 3 * '/..')
 sys.path.insert(0, parent_dir)
 
-from bye_splits.utils import params, common
+from bye_splits.utils import params, common, parsing
 
 import argparse
 import numpy as np
@@ -25,6 +25,7 @@ import pandas as pd
 import uproot as up
 import random
 import h5py
+import yaml
 #from bokeh.io import export_png
 
 from bokeh.io import output_file, show, save
@@ -51,37 +52,33 @@ def set_figure_props(p, hide_legend=True):
     if hide_legend:
         p.legend.click_policy='hide'
     
-def plot_trigger_cells_occupancy(pars,
-                                 plot_name,
-                                 pos_endcap,
-                                 layer_edges,
-                                 nevents,
-                                 log_scale=False,
-				 show_html=False,
-                                 **kw):
+def plot_trigger_cells_occupancy(pars, **kw):
     #assumes the binning is regular
-    binDistRz = kw['RzBinEdges'][1] - kw['RzBinEdges'][0] 
-    binDistPhi = kw['PhiBinEdges'][1] - kw['PhiBinEdges'][0]
+    binDistRz = kw['MaxROverZ'] - kw['MinROverZ'] 
+    binDistPhi = kw["MaxPhi"] - kw["MinPhi"]
     binConv = lambda vals,dist,amin : (vals*dist) + (dist/2) + amin
 
     SHIFTH, SHIFTV = 3*binDistPhi, binDistRz
 
-    tcDataPath = os.path.join(params.LocalStorage, 'test_triggergeom.root')
+    #tcDataPath = os.path.join(params.LocalStorage, 'test_triggergeom.root')
+    tcDataPath = "/data_CMS/cms/alves/L1HGCAL/test_triggergeom.root"
     tcFile = up.open(tcDataPath)
 
     tcFolder = 'hgcaltriggergeomtester'
     tcTreeName = 'TreeTriggerCells'
     tcTree = tcFile[ os.path.join(tcFolder, tcTreeName) ]
 
-    simDataPath = os.path.join(params.LocalStorage, 'summ_photon_truncation.hdf5')
+    #simDataPath = os.path.join(params.LocalStorage, 'summ_photon_truncation.hdf5') # SHOULD BE FILL IN STEP——most likely replaced by df_gen returned by *_chain_debug.parquet
+    simDataPath = "data/new_algos/tests_pu0/cluster_plot_ThresholdDummyHistomaxnoareath20_SEL_all_REG_Si_SW_1_SK_default_CA_min_distance.hdf5"
     simAlgoDFs, simAlgoFiles, simAlgoPlots = ({} for _ in range(3))
 
-    for fe in kw['FesAlgos']:
-        simAlgoFiles[fe] = [ os.path.join(simDataPath) ]
+    fe = kw["FesAlgo"]
+    simAlgoFiles[fe] = [ os.path.join(simDataPath) ]
 
     title_common = r'{} vs {} bins'.format(kw['NbinsPhi'], kw['NbinsRz'])
-    if pos_endcap:
-        title_common += '; Positive end-cap only'
+    """if pos_endcap:
+        title_common += '; Positive end-cap only'"""
+    title_common += '; Positive end-cap only'
     title_common += '; Min(R/z)={} and Max(R/z)={}'.format(kw['MinROverZ'],
                                                            kw['MaxROverZ'])
 
@@ -109,11 +106,14 @@ def plot_trigger_cells_occupancy(pars,
     with pd.HDFStore(outclusterplot, mode='r') as store:
         splittedClusters_3d_local = store['data']
 
-    tcData, subdetCond = common.tc_base_selection(tcData,
+    # Antiquated: the base selection is done in the skimming step now
+    '''tcData, subdetCond = common.tc_base_selection(tcData,
                                                   pos_endcap=pos_endcap,
                                                   region=pars['reg'],
                                                   range_rz=(kw['MinROverZ'],
-                                                            kw['MaxROverZ']))
+                                                            kw['MaxROverZ']))'''
+    
+    tcData, subdetCond = common.get_detector_region_mask(tcData, region=pars.reg)
     tcData.id = np.uint32(tcData.id)
 
     tcData_full = tcData[:]
@@ -143,14 +143,14 @@ def plot_trigger_cells_occupancy(pars,
     tcData_full = tcData_full.drop(_cols_drop, axis=1)
     tcData_sel = tcData_sel.drop(_cols_drop, axis=1)
 
-    # if `-1` is included in layer_edges, the full selection is also drawn
+    # if `-1` is included in pars["ledges"], the full selection is also drawn
     try:
-        layer_edges.remove(-1)
-        leftLayerEdges, rightLayerEdges = layer_edges[:-1], layer_edges[1:]
+        pars.ledges.remove(-1)
+        leftLayerEdges, rightLayerEdges = pars.ledges[:-1], pars.ledges[1:]
         leftLayerEdges.insert(0, 0)
         rightLayerEdges.insert(0, tcData_full.layer.max())
     except ValueError:
-        leftLayerEdges, rightLayerEdges = layer_edges[:-1], layer_edges[1:]
+        leftLayerEdges, rightLayerEdges = pars.ledges[:-1], pars.ledges[1:]
 
     ledgeszip = tuple(zip(leftLayerEdges,rightLayerEdges))
     tcSelections = ['layer>{}, layer<={}'.format(x,y) for x,y in ledgeszip]
@@ -208,7 +208,7 @@ def plot_trigger_cells_occupancy(pars,
         source_full = ColumnDataSource(grp_full)
         source_sel  = ColumnDataSource(grp_sel)
 
-        mapper_class = LogColorMapper if log_scale else LinearColorMapper
+        mapper_class = LogColorMapper if pars.log else LinearColorMapper
         mapper = mapper_class(palette=mypalette,
                               low=grp_full['ntc'].min(),
                               high=grp_full['ntc'].max())
@@ -242,7 +242,7 @@ def plot_trigger_cells_occupancy(pars,
         p_sel.rect(source=source_sel, **rect_opt)
 
         ticker = ( LogTicker(desired_num_ticks=len(mypalette))
-                   if log_scale
+                   if pars.log
                    else BasicTicker(desired_num_ticks=int(len(mypalette)/4)) )
         color_bar = ColorBar(color_mapper=mapper,
                              title='#Hits',
@@ -271,15 +271,15 @@ def plot_trigger_cells_occupancy(pars,
 
     for _k,(df_3d_cmssw,df_tc,df_3d_local) in simAlgoPlots.items():
 
-        if nevents > len(df_tc['event'].unique()):
+        if pars.nevents > len(df_tc['event'].unique()):
             nev_data = len(df_tc['event'].unique())
             m = ( 'You are trying to plot more events ({}) than '.format(nev_data) +
-                  'those available in the dataset ({}).'.format(nevents) )
+                  'those available in the dataset ({}).'.format(pars.nevents) )
             raise ValueError(m)
         
         event_sample = ( random.sample(df_tc['event'].unique()
                                        .astype('int').tolist(),
-                                       nevents)
+                                       pars.nevents)
                         )
         for ev in event_sample:
             # Inputs: Energy 2D histogram after smoothing but before clustering
@@ -389,9 +389,9 @@ def plot_trigger_cells_occupancy(pars,
             group_new.insert(0, 'max_eta', _etamaxs[1])
             group_new.insert(0, 'sum_en', _ensum[1])
 
-            mapper_class = LogColorMapper if log_scale else LinearColorMapper
+            mapper_class = LogColorMapper if pars.log else LinearColorMapper
             ticker = ( LogTicker(desired_num_ticks=len(mypalette))
-                      if log_scale
+                      if pars.log
                       else BasicTicker(desired_num_ticks=int(len(mypalette)/4)) )
             base_bar_opt = dict(ticker=ticker,
                                 formatter=PrintfTickFormatter(format="%d"))
@@ -518,19 +518,19 @@ def plot_trigger_cells_occupancy(pars,
             ev_panels.append( TabPanel(child=_lay,
                                     title='{}'.format(ev)) )
 
-    output_file(plot_name)
+    output_file(pars.plot_name)
 
     tc_panels_full, tc_panels_sel = ([] for _ in range(2))
     for i,(bkg1,bkg2) in enumerate(zip(bckg_full,bckg_sel)):
         tc_panels_full.append( TabPanel(child=bkg1,
                                      title='Full | Selection {}'.format(i)) )
         tc_panels_sel.append( TabPanel(child=bkg2,
-                                    title='Region {} | Selection {}'.format(pars['reg'],i)) )
+                                    title='Region {} | Selection {}'.format(pars.reg,i)) )
 
     lay = layout([[Tabs(tabs=ev_panels)],
                   [Tabs(tabs=tc_panels_sel)],
                   [Tabs(tabs=tc_panels_full)]])
-    show(lay) if show_html else save(lay)
+    show(lay) if pars.show_html else save(lay)
     # for pic,ev in pics:
     #     export_png(pic, filename=outname+'_event{}.png'.format(ev))
 
@@ -539,15 +539,25 @@ if __name__ == "__main__":
     parser.add_argument('--ledges', help='layer edges (if -1 is added the full range is also included)', default=[0,42], nargs='+', type=int)
     parser.add_argument('--pos_endcap', help='Use only the positive endcap.',
                         default=True, type=bool)
+    parser.add_argument('--show_html', help="Display plot instead of saving", default=False, type=bool)
     parser.add_argument('--hcal', help='Consider HCAL instead of default ECAL.', action='store_true')
     parser.add_argument('-l', '--log', help='use color log scale', action='store_true')
+    parser.add_argument('-n', '--nevents', help='number of events to include', type=int, default=-1)
+    parsing.add_parameters(parser)
 
     FLAGS = parser.parse_args()
+    pars = common.dot_dict(vars(FLAGS))
+    plot_name = os.path.join(parent_dir, "out", "tcOccupancy.html")
+    pars.update({"plot_name": plot_name})
+
+    with open(params.CfgPath,"r") as file:
+        cfg = yaml.safe_load(file)
+
+    plot_trigger_cells_occupancy(pars, **cfg["base"])
 
     # ERROR: standalone does not receive tc_map
-    plot_trigger_cells_occupancy(param,
-                                 selection,
+    '''plot_trigger_cells_occupancy(cfg,
                                  FLAGS.pos_endcap,
                                  FLAGS.ledges,
-                                 FLAGS.log)
+                                 FLAGS.log)'''
 
