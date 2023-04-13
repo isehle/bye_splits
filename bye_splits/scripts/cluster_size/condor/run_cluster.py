@@ -29,7 +29,7 @@ def cluster_coef(pars, cfg):
         cfg["clusterStudies"]["clusterSizeBaseName"],
         str(round(coef, 3)).replace(".", "p"),
     )
-    cluster_d["ClusterOutPlot"] = cl_size_coef
+    cluster_d["ClusterOutPlot"], cluster_d["ClusterOutValidation"] = cl_size_coef, cl_size_coef+"_valid"
     cluster_d["CoeffA"] = [coef, 0] * 50
 
     nevents_end = tasks.cluster.cluster_default(pars, **cluster_d)
