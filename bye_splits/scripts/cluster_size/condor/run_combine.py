@@ -21,6 +21,7 @@ import pandas as pd
 import sys
 
 import yaml
+from tqdm import tqdm
 
 def normalize_df(cl_df, gen_df):
     cl_df["pt"] = cl_df["en"] / np.cosh(cl_df["eta"])
@@ -36,15 +37,15 @@ def normalize_df(cl_df, gen_df):
     return cl_df
 
 
-def combine_files_by_coef(in_dir, out_path):
-    file_pattern = os.path.basename(out_path).replace(".hdf5", "")
+def combine_files_by_coef(in_dir, file_pattern):
     files = [
         file for file in os.listdir(in_dir) if re.search(file_pattern, file) != None
     ]
-
     coef_pattern = r"coef_0p(\d+)"
+    out_path = common.fill_path(file_pattern)
     with pd.HDFStore(out_path, "w") as clusterSizeOut:
-        for file in files:
+        print("\nCombining Files:\n")
+        for file in tqdm(files):
             key = re.search(coef_pattern, file).group()
             with pd.HDFStore(in_dir + "/" + file, "r") as clSizeCoef:
                 clusterSizeOut[key] = clSizeCoef["/data"]
@@ -53,16 +54,18 @@ def combine_files_by_coef(in_dir, out_path):
 def combine_cluster(cfg):
     nevents = cfg["clusterStudies"]["nevents"]
 
-    cl_size_out = common.fill_path(cfg["clusterStudies"]["clusterSizeBaseName"])
+    cl_basename = cfg["clusterStudies"]["clusterSizeBaseName"]
+    
+    combine_files_by_coef(params.LocalStorage, cl_basename)
 
-    combine_files_by_coef(params.LocalStorage, cl_size_out)
-
+    cl_size_out = common.fill_path(cl_basename)
     with pd.HDFStore(cl_size_out, mode="a") as clSizeOut:
         df_gen, _, _ = get_data_reco_chain_start(
             nevents=nevents, reprocess=False
         )
         coef_keys = clSizeOut.keys()
-        for coef in coef_keys[1:]:
+        print("\nNormalizing Files:\n")
+        for coef in tqdm(coef_keys[1:]):
             clSizeOut[coef] = normalize_df(clSizeOut[coef], df_gen)
 
 if __name__ == "__main__":

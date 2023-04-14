@@ -62,12 +62,14 @@ class CondJobBase(JobBatches):
             os.makedirs(batch_script_dir)
 
         batches = self.setup_batches()
+        global current_batch_versions
+        current_batch_versions = []
         for i, batch in enumerate(batches):
             out_name = "{}batch_{}.txt".format(batch_script_dir, i)
-            if not os.path.exists(out_name):
-                with open(out_name, "w") as batch_file:
-                    for path in batch:
-                        batch_file.write("{}\n".format(path))
+            written_version = common.grab_most_recent(out_name, return_all=True)
+            batch_lines = ["{}\n".format(b) for b in batch]
+            current_version = common.conditional_write(written_version, out_name, batch_lines)
+            current_batch_versions.append(current_version)
 
 
     def prepare_batch_submission(self):
@@ -102,8 +104,9 @@ class CondJobBase(JobBatches):
         batch_dir = "{}batches/".format(self.particle_dir)
         batch_script_dir = "{}{}/".format(batch_dir, os.path.splitext(os.path.basename(self.script))[0])
 
-        batch_files = os.listdir(batch_script_dir)
-        batch_files = [file for file in batch_files if file.endswith(".txt")]
+        #batch_files = os.listdir(batch_script_dir)
+        #batch_files = [file for file in batch_files if file.endswith(".txt")]
+        batch_files = current_batch_versions
 
         script_basename = os.path.basename(self.script).replace(".sh", "").replace(".py", "")
 
@@ -130,11 +133,12 @@ class CondJobBase(JobBatches):
         if self.require_args:
             current_version.append("queue filename from (\n")
             for file in batch_files:
-                current_version.append("{}{}\n".format(batch_script_dir, file))
+                current_version.append("{}\n".format(file))
+                #current_version.append("{}{}\n".format(batch_script_dir, file))
             current_version.append(")")
 
         # Write the file only if an identical file doesn't already exist
-        global submission_file # Save for a consistency check when launching
+        global submission_file # Save to launch later
         submission_file = common.conditional_write(job_file_versions, job_file_name_template, current_version)
 
 class CondJob(CondJobBase):
@@ -173,8 +177,6 @@ class CondJob(CondJobBase):
 
         sub_comm = ["condor_submit"]
 
-        script_basename = os.path.basename(self.script).replace(".sh", "").replace(".py", "")
-
         if not self.local:
             print(
                 "\nSending {} jobs on {}".format(self.particle, self.queue + "@{}".format(machine))
@@ -183,12 +185,8 @@ class CondJob(CondJobBase):
             print("\n")
 
         sub_args = []
-        sub_file_name = "{}jobs/{}.sub".format(self.particle_dir, script_basename)
-        sub_file_name = common.grab_most_recent(sub_file_name)
 
-        assert(sub_file_name == submission_file) # Consisistency check
-
-        sub_args.append(sub_file_name)
+        sub_args.append(submission_file)
 
         if self.local:
             comm = sub_args
@@ -196,7 +194,7 @@ class CondJob(CondJobBase):
             comm = sub_comm + sub_args
 
         print(str(datetime.now()), " ".join(comm))
-        status = subprocess.run(comm)
+        #status = subprocess.run(comm)
 
 if __name__ == "__main__":    
     with open(params.CfgPath, "r") as afile:

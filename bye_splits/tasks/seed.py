@@ -106,12 +106,12 @@ def seed(pars, debug=False, **kw):
                     mes = 'Only one cluster is expected in this scenario.'
                     raise ValueError(mes)
      
-                '''lft = (seeds_idx[0][0], seeds_idx[1][0]-1)
+                lft = (seeds_idx[0][0], seeds_idx[1][0]-1)
                 rgt = (seeds_idx[0][0], seeds_idx[1][0]+1)
                 enboth = energies[lft] + energies[rgt]
                 res[0] = np.array([enboth])
                 res[1] = np.array([(wght_x[lft]*energies[lft]+wght_x[rgt]*energies[rgt])/enboth])
-                res[2] = np.array([(wght_y[lft]*energies[lft]+wght_y[rgt]*energies[rgt])/enboth])'''
+                res[2] = np.array([(wght_y[lft]*energies[lft]+wght_y[rgt]*energies[rgt])/enboth])
                     
             search_str = '{}_([0-9]{{1,7}})_group'.format(kw['FesAlgo'])
             event_number = re.search(search_str, key).group(1)

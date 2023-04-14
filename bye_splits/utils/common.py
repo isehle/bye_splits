@@ -142,14 +142,11 @@ def grab_most_recent(file_path, return_all=False):
     if len(matches) > 0:
         matches = [int(match.group(1)) for match in matches]
         most_recent = max(matches)
-        file_path = dir + "/" + base + "_v" + str(most_recent) + ext
-        file_paths = [dir + "/" + base + "_v" + str(f) + ext for f in matches]
-        if not return_all:            
-            return file_path
+        if not return_all:
+            file_path = dir + "/" + base + "_v" + str(most_recent) + ext
         else:
-            return file_paths
-    else:
-        return None
+            file_path = [dir + "/" + base + "_v" + str(f) + ext for f in matches]
+        return file_path
 
 def compare_file_contents(file_path, buffer_list):
     """
@@ -184,7 +181,7 @@ def conditional_write(file_versions, file_template, current_version):
                 continue
             else:
                 identical_version = True
-                file_path = grab_most_recent(file_template)
+                file_path = file
                 break
         if not identical_version:
             file_path = write_file_version(file_template, current_version)
