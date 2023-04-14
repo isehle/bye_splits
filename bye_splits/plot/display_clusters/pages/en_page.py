@@ -28,26 +28,14 @@ parser = argparse.ArgumentParser(description="")
 parsing.add_parameters(parser)
 FLAGS = parser.parse_args()
 
-# Old Naming Conventions used different column names in dataframes
-column_matching = {
-    "etanew": "eta",
-    "phinew": "phi",
-    "genpart_exphi": "gen_phi",
-    "genpart_exeta": "gen_eta",
-    "genpart_energy": "gen_en",
-}
+cfg = cl_helpers.read_cl_size_params()
 
-with open(params.CfgPath, "r") as afile:
-    cfg = yaml.safe_load(afile)
-
-pile_up_dir = "PU0" if not cfg["clusterStudies"]["pileUp"] else "PU200"
-
-if cfg["clusterStudies"]["local"]:
-    data_dir = cfg["clusterStudies"]["localDir"]
+if cfg["local"]:
+    data_dir = cfg["localDir"]
 else:
-    data_dir = params.EOSStorage(FLAGS.user, cfg["clusterStudies"]["dataFolder"])
+    data_dir = params.EOSStorage(FLAGS.user, cfg["dataFolder"])
 
-input_files = cl_helpers.get_output_files(cfg)
+input_files = cfg["dashApp"]
 
 dash.register_page(__name__, title="Energy", name="Energy")
 
@@ -55,7 +43,8 @@ layout = html.Div(
     [
         html.H4("Normalized Cluster Energy"),
         html.Hr(),
-        html.Div([dbc.Button("Pile Up", id="pileup", color="primary", disabled=True)]),
+        html.Div([dbc.Button("Pile Up", id="pileup", color="primary", n_clicks=0),
+                  dcc.Input(id="pt_cut", value="PT Cut", type='text')]),
         html.Hr(),
         dcc.Graph(id="cl-en-graph", mathjax=True),
         html.P("EtaRange:"),
@@ -66,36 +55,18 @@ layout = html.Div(
 )
 
 
-def fill_dict_w_mean_norm(key, coef, eta, df, norm, out_dict, df_needs_norm=False):
-    """The df_needs_norm bool handles legacy code which calculated the norm in this file,
-    while the updated version of the cluster size study calculates it directly."""
-    if df_needs_norm:
-        if norm == "PT":
-            df["pt"] = (
-                df["en"] / np.cosh(df["eta"]) if "pt" not in df.keys() else df["pt"]
-            )
-            df["normed_energies"] = (
-                df["pt"] / df["genpart_pt"]
-                if "genpart_pt" in df.keys()
-                else df["pt"] / df["gen_pt"]
-            )
-        else:
-            df["normed_energies"] = df["en"] / df["gen_en"]
-
-        df = df[(df.gen_eta > eta[0]) & (df.gen_eta < eta[1])]
-
-        mean_energy = df["normed_energies"].mean()
+def fill_dict_w_mean_norm(key, eta, pt_cut, df, norm, out_dict):
+    pt_cut = float(pt_cut) if pt_cut!="PT Cut" else 0
+    df = df[(df.gen_eta > eta[0]) & (df.gen_eta < eta[1]) & (df.pt > pt_cut) ]
+    if norm == "PT":
+        mean_energy = df["pt_norm"].mean()
     else:
-        df = df[(df.gen_eta > eta[0]) & (df.gen_eta < eta[1])]
-        if norm == "PT":
-            mean_energy = df["pt_norm"].mean()
-        else:
-            mean_energy = df["en_norm"].mean()
+        mean_energy = df["en_norm"].mean()
 
     out_dict[key] = np.append(out_dict[key], mean_energy)
 
 
-def write_plot_file(input_files, norm, eta, outfile, pars=vars(FLAGS)):
+def write_plot_file(input_files, norm, eta, pt, outfile, pars=vars(FLAGS)):
     normed_energies = {}
     for key in input_files.keys():
         # Initialize at 0 since we only consider coefs[1:] (coefs[0] is an empty dataframe)
@@ -109,15 +80,9 @@ def write_plot_file(input_files, norm, eta, outfile, pars=vars(FLAGS)):
             with pd.HDFStore(input_files[key][0], "r") as File:
                 coef_strs = File.keys()
                 for coef in coef_strs[1:]:
-                    if File[coef].index.name != "event":
-                        df = File[coef].set_index("event")
-                    try:
-                        df = df.drop(columns=["matches", "en_max"])
-                        df.rename(column_matching, axis=1, inplace=True)
-                    except KeyError:
-                        pass
+                    df = File[coef] if File[coef].index.name=="event" else File[coef].set_index("event")
                     fill_dict_w_mean_norm(
-                        key, coef, eta, df, norm, normed_energies, df_needs_norm=True
+                        key, eta, pt, df, norm, normed_energies
                     )
         else:
             file_list = [pd.HDFStore(val, "r") for val in input_files[key]]
@@ -130,13 +95,8 @@ def write_plot_file(input_files, norm, eta, outfile, pars=vars(FLAGS)):
                     if not full_df.index.name == "event"
                     else full_df
                 )
-                try:
-                    full_df = full_df.drop(columns=["matches", "en_max"])
-                    full_df.rename(column_matching, axis=1, inplace=True)
-                except KeyError:
-                    pass
                 fill_dict_w_mean_norm(
-                    key, coef, eta, full_df, norm, normed_energies, df_needs_norm=True
+                    key, eta, pt, full_df, norm, normed_energies
                 )
 
             for file in file_list:
@@ -153,13 +113,14 @@ def write_plot_file(input_files, norm, eta, outfile, pars=vars(FLAGS)):
     Output("cl-en-graph", "figure"),
     Input("normby", "value"),
     Input("eta_range", "value"),
+    Input("pt_cut", "value"),
     Input("pileup", "n_clicks"),
 )
 def plot_norm(
-    normby, eta_range, pileup, init_files=input_files, plot_file="normed_distribution"
+    normby, eta_range, pt_cut, pileup, plot_file="normed_distribution"
 ):
-    button_clicked = ctx.triggered_id
-    pile_up = True if button_clicked == "pileup" else False
+    # even number of clicks --> PU0, odd --> PU200 (will reset with other callbacks otherwise)
+    init_files = input_files["PU0"] if pileup%2==0 else input_files["PU200"]
     global y_axis_title
 
     if normby == "Energy":
@@ -169,13 +130,19 @@ def plot_norm(
     else:
         y_axis_title = r"$\huge{\frac{E_{Cl}}{E_{Max}}}$"
 
-    plot_filename = "{}_{}_eta_{}_{}.hdf5".format(
-        normby, plot_file, eta_range[0], eta_range[1]
+    pt_str = "0" if pt_cut=="PT Cut" else pt_cut
+
+    plot_filename = "{}_{}_eta_{}_pt_gtr_{}_{}_testing_".format(
+        normby, plot_file, eta_range[0], eta_range[1], pt_str
     )
+    plot_filename += "_PU0.hdf5" if pileup%2==0 else "_PU200.hdf5"
+    
+    pile_up_dir = "PU0" if pileup%2==0 else "PU200"
+
     plot_filename_user = "{}{}/{}".format(data_dir, pile_up_dir, plot_filename)
     plot_filename_iehle = "{}{}{}/new_{}".format(
-        cfg["clusterStudies"]["ehleDir"],
-        cfg["clusterStudies"]["dataFolder"],
+        cfg["ehleDir"],
+        cfg["dataFolder"],
         pile_up_dir,
         plot_filename,
     )
@@ -187,24 +154,30 @@ def plot_norm(
         with pd.HDFStore(plot_filename_iehle, "r") as PlotFile:
             normed_dist = PlotFile["/Normed_Dist"].to_dict(orient="list")
     else:
-        normed_dist = write_plot_file(init_files, normby, eta_range, plot_filename_user)
+        normed_dist = write_plot_file(init_files, normby, eta_range, pt_cut, plot_filename_user)
 
-    # Older files were written using singular keys, this ensures standardization to the new format
-    dict_keys = ["photons", "pions"]
-    normed_dist = dict(zip(dict_keys, normed_dist.values()))
-
-    start, end, tot = cfg["clusterStudies"]["coeffs"]
+    start, end, tot = cfg["coeffs"]
     coefs = np.linspace(start, end, tot)
 
     coef_labels = [round(coef, 3) for coef in coefs]
     coef_labels = coef_labels[0::5]
 
-    fig = make_subplots(rows=1, cols=2, subplot_titles=("Photon", "Pion"))
+    fig = make_subplots(rows=1, cols=2, subplot_titles=("EM", "Hadronic"))
+    
+    particles = normed_dist.keys()
+    colors = ["green", "purple", "red"]
+    colors = colors[:len(particles)]
 
-    en_phot, en_pion = normed_dist["photons"], normed_dist["pions"]
-
-    fig.add_trace(go.Scatter(x=coefs, y=en_phot, name="Photon"), row=1, col=1)
-    fig.add_trace(go.Scatter(x=coefs, y=en_pion, name="Pion"), row=1, col=2)
+    for particle, color in zip(particles, colors):
+        fig.add_trace(go.Scatter(
+                            x=coefs,
+                            y=normed_dist[particle],
+                            name=particle.capitalize(),
+                            line_color=color,
+                        ),
+                        row=1,
+                        col=2 if particle=="pions" else 1
+        )
 
     fig.add_hline(y=1.0, line_dash="dash", line_color="green")
 

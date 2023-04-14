@@ -1,13 +1,13 @@
 import os
 import sys
-from dash import dcc, html, Input, Output, callback, ctx
+from dash import dcc, html, Input, Output, callback, ctx, Dash
 import dash
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
 import pandas as pd
-import yaml
+import random
 
 parent_dir = os.path.abspath(__file__ + 5 * "/..")
 sys.path.insert(0, parent_dir)
@@ -19,21 +19,17 @@ parser = argparse.ArgumentParser(description="")
 parsing.add_parameters(parser)
 FLAGS = parser.parse_args()
 
-with open(params.CfgPath, "r") as afile:
-    cfg = yaml.safe_load(afile)
+cfg = cl_helpers.read_cl_size_params()
 
-pile_up_dir = "PU0" if not cfg["clusterStudies"]["pileUp"] else "PU200"
-
-if cfg["clusterStudies"]["local"]:
-    data_dir = cfg["clusterStudies"]["localDir"]
+if cfg["local"]:
+    data_dir = cfg["localDir"]
 else:
     data_dir = params.EOSStorage(FLAGS.user, "data/")
 
-input_files = cl_helpers.get_output_files(cfg)
+input_files = cfg["dashApp"]
 
 def rms(data):
     return np.sqrt(np.mean(np.square(data)))
-
 
 def effrms(data, c=0.68):
     """Compute half-width of the shortest interval
@@ -43,68 +39,28 @@ def effrms(data, c=0.68):
     new_series = data.dropna()
     x = np.sort(new_series, kind="mergesort")
     m = int(c * len(x)) + 1
-    # out = [np.min(x[m:] - x[:-m]) / 2.0]
     out = np.min(x[m:] - x[:-m]) / 2.0
 
     return out
 
+def get_rms(init_files, coef, eta_range, pt_cut, normby, rms_dict=None, rms_eff_dict=None):
+    dfs_by_particle = cl_helpers.get_dfs(init_files, coef)
+    pt_cut = float(pt_cut) if pt_cut!="PT Cut" else 0
 
-def get_rms(coef, eta_range, normby, rms_dict=None, rms_eff_dict=None, binned_rms=True):
-    dfs_by_particle = cl_helpers.get_dfs(input_files, coef)
+    dfs_by_particle = cl_helpers.filter_dfs(dfs_by_particle, eta_range, pt_cut)
 
-    # Older files were written using singular keys, this ensures standardization to the new format
-    dict_keys = ["photons", "pions"]
-    dfs_by_particle = dict(zip(dict_keys, dfs_by_particle.values()))
-
-    phot_df, pion_df = dfs_by_particle["photons"], dfs_by_particle["pions"]
-
-    if normby == "Energy":
-        phot_df["normed_energies"] = phot_df["en"] / phot_df["gen_en"]
-        pion_df["normed_energies"] = pion_df["en"] / pion_df["gen_en"]
-    else:
-        phot_df["pt"] = (
-            phot_df["en"] / np.cosh(phot_df["eta"])
-            if "pt" not in phot_df.keys()
-            else phot_df["pt"]
-        )
-        pion_df["pt"] = (
-            pion_df["en"] / np.cosh(pion_df["eta"])
-            if "pt" not in pion_df.keys()
-            else pion_df["pt"]
-        )
-
-        phot_df["normed_energies"] = phot_df["pt"] / phot_df["genpart_pt"]
-        pion_df["normed_energies"] = pion_df["pt"] / pion_df["genpart_pt"]
-
-    phot_df = phot_df[
-        (phot_df.gen_eta > eta_range[0]) & (phot_df.gen_eta < eta_range[1])
-    ]
-    pion_df = pion_df[
-        (pion_df.gen_eta > eta_range[0]) & (pion_df.gen_eta < eta_range[1])
-    ]
-
-    phot_mean_en = phot_df["normed_energies"].mean()
-    pion_mean_en = pion_df["normed_energies"].mean()
-
-    phot_rms = phot_df["normed_energies"].std() / phot_mean_en
-    phot_eff_rms = effrms(phot_df["normed_energies"]) / phot_mean_en
-
-    pion_rms = pion_df["normed_energies"].std() / pion_mean_en
-    pion_eff_rms = effrms(pion_df["normed_energies"]) / pion_mean_en
-
-    if binned_rms:
-        return (
-            phot_df,
-            pion_df,
-            {"Photon": phot_rms, "Pion": pion_rms},
-            {"Photon": phot_eff_rms, "Pion": pion_eff_rms},
-        )
-    else:
-        rms_dict["Photon"] = np.append(rms_dict["Photon"], phot_rms)
-        rms_eff_dict["Photon"] = np.append(rms_eff_dict["Photon"], phot_eff_rms)
-
-        rms_dict["Pion"] = np.append(rms_dict["Pion"], pion_rms)
-        rms_eff_dict["Pion"] = np.append(rms_eff_dict["Pion"], pion_eff_rms)
+    new_dict = {}
+    for particle, df in dfs_by_particle.items():
+        norm = df["en_norm"] if normby == "Energy" else df["pt_norm"]
+        rms = norm.std() / norm.mean()
+        eff_rms = effrms(norm) / norm.mean()
+        new_dict[particle] = (df, rms, eff_rms)
+        if rms_dict!=None:
+            rms_dict[particle] = np.append(rms_dict[particle], rms)
+            rms_eff_dict[particle] = np.append(rms_eff_dict[particle], eff_rms)
+    
+    if rms_dict==None:
+        return new_dict
 
 
 # Dash page setup
@@ -128,7 +84,8 @@ layout = dbc.Container(
             ]
         ),
         html.Hr(),
-        html.Div([dbc.Button("Pile Up", id="pileup", color="primary", disabled=True)]),
+        html.Div([dbc.Button("Pile Up", id="pileup", color="primary", n_clicks=0),
+                  dcc.Input(id="pt_cut", value="PT Cut", type='text')]),
         html.Hr(),
         dcc.Graph(id="histograms-x-graph", mathjax=True),
         html.P("Coef:"),
@@ -163,6 +120,7 @@ layout = dbc.Container(
     Output("my_table", "children"),
     Input("coef", "value"),
     Input("eta_range", "value"),
+    Input("pt_cut","value"),
     Input("normby", "value"),
     Input("pileup", "n_clicks"),
 )
@@ -170,39 +128,35 @@ layout = dbc.Container(
 ##############################################################################################################################
 
 
-def plot_dists(coef, eta_range, normby, pileup):
-    button_clicked = ctx.triggered_id
-    pile_up = True if button_clicked == "pileup" else False
+def plot_dists(coef, eta_range, pt_cut, normby, pileup):
+    init_files = input_files["PU0"] if pileup%2==0 else input_files["PU200"]
 
-    phot_df, pion_df, rms, eff_rms = get_rms(coef, eta_range, normby)
-
-    phot_rms, pion_rms = rms["Photon"], rms["Pion"]
-    phot_eff_rms, pion_eff_rms = eff_rms["Photon"], eff_rms["Pion"]
-
-    phot_gaus_diff = np.abs(phot_eff_rms - phot_rms) / phot_rms
-    pion_gaus_diff = np.abs(pion_eff_rms - pion_rms) / pion_rms
-
-    pion_gaus_str = format(pion_gaus_diff, ".3f")
-    phot_gaus_str = format(phot_gaus_diff, ".3f")
-
-    pion_rms_str = format(pion_rms, ".3f")
-    phot_rms_str = format(phot_rms, ".3f")
-
-    pion_eff_rms_str = format(pion_eff_rms, ".3f")
-    phot_eff_rms_str = format(phot_eff_rms, ".3f")
-
+    data_by_particle = get_rms(init_files, coef, eta_range, pt_cut, normby) # {particle: (df, rms, eff_rms)}
+    
     fig = go.Figure()
 
-    fig.add_trace(
-        go.Histogram(
-            x=pion_df["normed_energies"], nbinsx=100, autobinx=False, name="Pion"
-        )
-    )
-    fig.add_trace(
-        go.Histogram(
-            x=phot_df["normed_energies"], nbinsx=100, autobinx=False, name="Photon"
-        )
-    )
+    col_name = "pt_norm" if normby!="Energy" else "en_norm"
+    vals = {}
+    for particle in data_by_particle.keys():
+        df, rms, eff_rms = data_by_particle[particle]
+
+        bins = np.linspace(min(df[col_name]),max(df[col_name]), 100)
+        df[col_name + "_bin"] = pd.cut(df[col_name], bins=bins, labels=False)
+        
+        sub_df = df[[col_name, col_name + "_bin"]].reset_index()
+        binned_rand_evs = sub_df.groupby(col_name + "_bin")["event"].apply(lambda x: "Random Event: "+str(np.random.choice(x)))
+
+        fig.add_trace(go.Histogram(x=df[col_name], nbinsx=100, autobinx=False, name=particle.capitalize(), hovertext=binned_rand_evs))
+
+        gauss_diff = np.abs(eff_rms - rms) / rms
+        gauss_str = format(gauss_diff, ".3f")
+
+        vals[particle] = {"RMS": rms, "Effective RMS": eff_rms, "Gaussianity": gauss_str}
+
+        val_df = pd.DataFrame(vals).reset_index()
+        val_df = val_df.rename(columns={"index": ""})
+
+        val_table = dbc.Table.from_dataframe(val_df)
 
     if normby == "Energy":
         x_title = r"$\Huge{\frac{E_{Cl}}{E_{Gen}}}$"
@@ -218,32 +172,18 @@ def plot_dists(coef, eta_range, normby, pileup):
 
     fig.update_traces(opacity=0.5)
 
-    my_vals = {
-        "Photon": {
-            "RMS": phot_rms_str,
-            "Effective RMS": phot_eff_rms_str,
-            "Gaussianity": phot_gaus_str,
-        },
-        "Pion": {
-            "RMS": pion_rms_str,
-            "Effective RMS": pion_eff_rms_str,
-            "Gaussianity": pion_gaus_str,
-        },
-    }
+    return fig, val_table
 
-    val_df = pd.DataFrame(my_vals).reset_index()
-    val_df = val_df.rename(columns={"index": ""})
-
-    return fig, dbc.Table.from_dataframe(val_df)
-
-
-def write_rms_file(coefs, eta, norm, filename):
-    rms_by_part = {"Photon": [], "Pion": []}
-
-    rms_eff_by_part = {"Photon": [], "Pion": []}
+def write_rms_file(init_files, coefs, eta, pt, norm, filename):
+    rms_by_part, rms_eff_by_part = {}, {}
+    for particle in init_files.keys():
+        if len(init_files[particle])>0:
+            rms_by_part[particle] = []
+            rms_eff_by_part[particle] = []
 
     for coef in coefs[1:]:
-        get_rms(coef, eta, norm, rms_by_part, rms_eff_by_part, binned_rms=False)
+        get_rms(init_files, coef, eta, pt, norm, rms_by_part, rms_eff_by_part)
+
     with pd.HDFStore(filename, "w") as glob_rms_file:
         glob_rms_file.put("RMS", pd.DataFrame.from_dict(rms_by_part))
         glob_rms_file.put("Eff_RMS", pd.DataFrame.from_dict(rms_eff_by_part))
@@ -254,21 +194,28 @@ def write_rms_file(coefs, eta, norm, filename):
 @callback(
     Output("global-rms-graph", "figure"),
     Input("eta_range", "value"),
+    Input("pt_cut", "value"),
     Input("normby", "value"),
     Input("pileup", "n_clicks"),
 )
-def glob_rms(eta_range, normby, pileup, file="rms_and_eff.hdf5"):
-    button_clicked = ctx.triggered_id
-    pile_up = True if button_clicked == "pileup" else False
+def glob_rms(eta_range, pt_cut, normby, pileup, file="rms_and_eff"):
+    # even number of clicks --> PU0, odd --> PU200 (will reset with other callbacks otherwise)
+    init_files = input_files["PU0"] if pileup%2==0 else input_files["PU200"]
 
-    coefs = cl_helpers.get_keys(input_files)
+    coefs = cl_helpers.get_keys(init_files)
 
-    filename = "{}_eta_{}_{}_{}".format(
-        normby, str(eta_range[0]), str(eta_range[1]), file
+    pt_cut = "0" if pt_cut=="PT Cut" else pt_cut
+
+    filename = "{}_eta_{}_{}_pt_gtr_{}_{}_newRMS".format(
+        normby, str(eta_range[0]), str(eta_range[1]), pt_cut, file
     )
+
+    filename += "_PU0.hdf5" if pileup%2==0 else "_PU200.hdf5"
+    pile_up_dir = "PU0" if pileup%2==0 else "PU200"
+
     filename_user = "{}{}/{}".format(data_dir, pile_up_dir, filename)
     filename_iehle = "{}{}{}/{}".format(
-        cfg["clusterStudies"]["ehleDir"], cfg["clusterStudies"]["dataFolder"], pile_up_dir, filename
+        cfg["ehleDir"], cfg["dataFolder"], pile_up_dir, filename
     )
 
     if os.path.exists(filename_user):
@@ -283,27 +230,31 @@ def glob_rms(eta_range, normby, pileup, file="rms_and_eff.hdf5"):
             ), glob_rms_file["/Eff_RMS"].to_dict(orient="list")
     else:
         rms_by_part, rms_eff_by_part = write_rms_file(
-            coefs, eta_range, normby, filename_user
+            init_files, coefs, eta_range, pt_cut, normby, filename_user
         )
 
     nice_coefs = np.linspace(0.0, 0.05, 50)
 
-    fig = make_subplots(rows=1, cols=2, subplot_titles=("Photon", "Pion"))
+    fig = make_subplots(rows=1, cols=2, subplot_titles=("EM", "Hadronic"))
 
-    for var in ["RMS", "Eff-RMS"]:
-        for particle, color in zip(["Photon", "Pion"], ["purple", "red"]):
+    particles = rms_by_part.keys()
+    colors = ["green", "purple", "red"]
+    colors = colors[:len(particles)]
+
+    for var in ("RMS", "Eff-RMS"):
+        for particle, color in zip(particles, colors):
             fig.add_trace(
                 go.Scatter(
                     x=nice_coefs,
                     y=rms_by_part[particle]
                     if var == "RMS"
                     else rms_eff_by_part[particle],
-                    name=var,
+                    name="{} {}".format(particle.capitalize(), var),
                     line_color=color,
                     mode="lines" if var == "RMS" else "markers",
                 ),
                 row=1,
-                col=1 if particle == "Photon" else 2,
+                col=2 if particle == "pions" else 1,
             )
 
     fig.update_xaxes(title_text="Radius (Coefficient)")

@@ -21,19 +21,14 @@ parser = argparse.ArgumentParser(description="Clustering standalone step.")
 parsing.add_parameters(parser)
 FLAGS = parser.parse_args()
 
-with open(params.CfgPath, "r") as afile:
-    cfg = yaml.safe_load(afile)
+cfg = cl_helpers.read_cl_size_params()
 
-# pile_up_dir = "PU0" if not cfg["clusterSize"]["pileUp"] else "PU200"
-pile_up_dir = "PU0" if not cfg["clusterStudies"]["pileUp"] else "PU200"
-
-if cfg["clusterStudies"]["local"]:
-    data_dir = cfg["clusterStudies"]["localDir"]
+if cfg["local"]:
+    data_dir = cfg["localDir"]
 else:
-    data_dir = params.EOSStorage(FLAGS.user, "data/")
+    data_dir = params.EOSStorage(FLAGS.user, cfg["dataFolder"])
 
-input_files = cl_helpers.get_output_files(cfg)
-
+input_files = cfg["dashApp"]
 
 def binned_effs(df, norm, perc=0.1):
     """Takes a dataframe 'df' with a column 'norm' to normalize by, and returns
@@ -89,7 +84,8 @@ layout = dbc.Container(
             ]
         ),
         html.Hr(),
-        html.Div([dbc.Button("Pile Up", id="pileup", color="primary", disabled=True)]),
+        html.Div([dbc.Button("Pile Up", id="pileup", color="primary", n_clicks=0),
+                  dcc.Input(id="pt_cut", value="PT Cut", type='text')]),
         html.Hr(),
         dcc.Graph(id="eff-graph", mathjax=True),
         html.P("Coef:"),
@@ -127,44 +123,44 @@ layout = dbc.Container(
     Output("glob-effs", "children"),
     Input("coef", "value"),
     Input("eta_range", "value"),
+    Input("pt_cut", "value"),
     Input("normby", "value"),
     Input("pileup", "n_clicks"),
 )
 
 ##############################################################################################################################
 
+def display_color(coef, eta_range, pt_cut, normby, pileup):
+    # even number of clicks --> PU0, odd --> PU200 (will reset with other callbacks otherwise)
+    init_files = input_files["PU0"] if pileup%2==0 else input_files["PU200"]
 
-def display_color(coef, eta_range, normby, pileup):
-    button_clicked = ctx.triggered_id
-    pile_up = True if button_clicked == "pileup" else False
+    df_by_particle = cl_helpers.get_dfs(init_files, coef)
+    pt_cut = float(pt_cut) if pt_cut!="PT Cut" else 0
+    df_by_particle = cl_helpers.filter_dfs(df_by_particle, eta_range, pt_cut)  # {particle: (df, rms, eff_rms)}
 
-    df_by_particle = cl_helpers.get_dfs(input_files, coef)
-    phot_df = df_by_particle["photons"]
-    pion_df = df_by_particle["pions"]
+    fig = make_subplots(rows=1, cols=2, subplot_titles=("EM", "Hadronic"))
+    col_name = "gen_pt" if normby != "Energy" else "gen_en"
 
-    phot_df = phot_df[
-        (phot_df.gen_eta > eta_range[0]) & (phot_df.gen_eta < eta_range[1])
-    ]
-    pion_df = pion_df[
-        (pion_df.gen_eta > eta_range[0]) & (pion_df.gen_eta < eta_range[1])
-    ]
+    particles = df_by_particle.keys()
+    colors = ["green", "purple", "red"]
+    colors = colors[:len(particles)]
 
-    # Bin energy data into n% chunks to check eff/energy (10% is the default)
-    if normby == "Energy":
-        phot_effs, phot_x = binned_effs(phot_df, "gen_en")
-        pion_effs, pion_x = binned_effs(pion_df, "gen_en")
-    else:
-        phot_effs, phot_x = binned_effs(phot_df, "genpart_pt")
-        pion_effs, pion_x = binned_effs(pion_df, "genpart_pt")
+    glob_eff_dict = {}
+    for particle in particles:
+        df = df_by_particle[particle]
+        effs, x = binned_effs(df, col_name)
+        glob_eff_dict[particle] = np.mean(effs[1:])
+        fig.add_trace(
+            go.Scatter(
+            x=x,
+            y=effs,
+            name=particle.capitalize()
+            ),
+            row=1,
+            col=2 if particle=="pions" else 1
+        )
 
-    glob_effs = pd.DataFrame(
-        {"photons": np.mean(phot_effs[1:]), "pions": np.mean(pion_effs[1:])}, index=[0]
-    )
-
-    fig = make_subplots(rows=1, cols=2, subplot_titles=("Photon", "Pion"))
-
-    fig.add_trace(go.Scatter(x=phot_x, y=phot_effs, name="photons"), row=1, col=1)
-    fig.add_trace(go.Scatter(x=pion_x, y=pion_effs, name="pions"), row=1, col=2)
+    glob_effs = pd.DataFrame(glob_eff_dict, index=[0])
 
     fig.update_xaxes(title_text="{} (GeV)".format(normby))
 
@@ -177,24 +173,22 @@ def display_color(coef, eta_range, normby, pileup):
 
     return fig, dbc.Table.from_dataframe(glob_effs)
 
+def write_eff_file(init_files, norm, coefs, eta, pt_cut, file):
+    pt_cut = float(pt_cut) if pt_cut!="PT Cut" else 0
+    binned_var = "gen_en" if norm == "Energy" else "gen_pt"
+    
+    effs_dict = {}
+    for coef in coefs:
+        dfs_by_particle = cl_helpers.get_dfs(init_files, coef)
+        dfs_by_particle = cl_helpers.filter_dfs(dfs_by_particle, eta, pt_cut)
 
-def write_eff_file(norm, coefs, eta, file):
-    # Note that a cluster having radius (coef) zero also has zero efficiency, so we initialize as such and calculate for the following coefs (i.e. starting with coefs[1])
-    effs_dict = {"photons": [0.0], "pions": [0.0]}
-    for coef in coefs[1:]:
-        dfs_by_particle = cl_helpers.get_dfs(input_files, coef)
-        phot_df = dfs_by_particle["photons"]
-        pion_df = dfs_by_particle["pions"]
-
-        phot_df = phot_df[(phot_df.gen_eta > eta[0]) & (phot_df.gen_eta < eta[1])]
-        pion_df = pion_df[(pion_df.gen_eta > eta[0]) & (pion_df.gen_eta < eta[1])]
-
-        binned_var = "gen_en" if norm == "Energy" else "genpart_pt"
-        phot_eff, _ = binned_effs(phot_df, binned_var, 1.0)
-        pion_eff, _ = binned_effs(pion_df, binned_var, 1.0)
-
-        effs_dict["photons"] = np.append(effs_dict["photons"], phot_eff)
-        effs_dict["pions"] = np.append(effs_dict["pions"], pion_eff)
+        for particle in dfs_by_particle.keys():
+            # Note that a cluster having radius (coef) zero also has zero efficiency, so we initialize as such
+            if particle not in effs_dict.keys():
+                effs_dict[particle] = [0.0]
+            else:
+                eff, _ = binned_effs(dfs_by_particle[particle], binned_var, 1.0)
+                effs_dict[particle] = np.append(effs_dict[particle], eff)
 
     with pd.HDFStore(file, "w") as glob_eff_file:
         glob_eff_file.put("Eff", pd.DataFrame.from_dict(effs_dict))
@@ -206,22 +200,26 @@ def write_eff_file(norm, coefs, eta, file):
 @callback(
     Output("glob-eff-graph", "figure"),
     Input("eta_range", "value"),
+    Input("pt_cut", "value"),
     Input("normby", "value"),
     Input("pileup", "n_clicks"),
 )
-def global_effs(eta_range, normby, pileup, file="global_eff.hdf5"):
-    button_clicked = ctx.triggered_id
-    pile_up = True if button_clicked == "pileup" else False
+def global_effs(eta_range, pt_cut, normby, pileup, file="global_eff"):
+    # even number of clicks --> PU0, odd --> PU200 (will reset with other callbacks otherwise)
+    init_files = input_files["PU0"] if pileup%2==0 else input_files["PU200"]
 
-    coefs = cl_helpers.get_keys(input_files)
+    coefs = cl_helpers.get_keys(init_files)
 
-    filename = "{}_eta_{}_{}_{}".format(normby, eta_range[0], eta_range[1], file)
+    pt_str = "0" if pt_cut=="PT Cut" else pt_cut
+
+    filename = "{}_eta_{}_{}_pt_gtr_{}_{}".format(normby, eta_range[0], eta_range[1], pt_str, file)
+    filename += "_PU0.hdf5" if pileup%2==0 else "_PU200.hdf5"
+    
+    pile_up_dir = "PU0" if pileup%2==0 else "PU200"
+
     filename_user = "{}{}/{}".format(data_dir, pile_up_dir, filename)
     filename_iehle = "{}{}{}/{}".format(
-        cfg["clusterStudies"]["ehleDir"],
-        cfg["clusterStudies"]["dataFolder"],
-        pile_up_dir,
-        filename,
+        cfg["ehleDir"], cfg["dataFolder"], pile_up_dir, filename
     )
 
     if os.path.exists(filename_user):
@@ -231,27 +229,29 @@ def global_effs(eta_range, normby, pileup, file="global_eff.hdf5"):
         with pd.HDFStore(filename_iehle, "r") as glob_eff_file:
             effs_by_coef = glob_eff_file["/Eff"].to_dict(orient="list")
     else:
-        effs_by_coef = write_eff_file(normby, coefs, eta_range, filename_user)
-
-    # Old convention created the DFs and dicts with the keys 'Photon'/'Pion' instead of 'photons'/'pions'
-    dict_keys = ["photons", "pions"]
-    effs_by_coef = dict(zip(dict_keys, effs_by_coef.values()))
+        effs_by_coef = write_eff_file(init_files, normby, coefs, eta_range, pt_cut, filename_user)
 
     coefs = np.linspace(0.0, 0.05, 50)
 
-    fig = make_subplots(rows=1, cols=2, subplot_titles=("Photon", "Pion"))
+    fig = make_subplots(rows=1, cols=2, subplot_titles=("EM", "Hadronic"))
 
-    fig.add_trace(
-        go.Scatter(x=coefs, y=effs_by_coef["photons"], name="photons"), row=1, col=1
-    )
-    fig.add_trace(
-        go.Scatter(x=coefs, y=effs_by_coef["pions"], name="pions"), row=1, col=2
-    )
+    particles = effs_by_coef.keys()
+    colors = ["green", "purple", "red"]
+    colors = colors[:len(particles)]
+
+    for particle, color in zip(particles, colors):
+        fig.add_trace(
+            go.Scatter(
+                x=coefs,
+                y=effs_by_coef[particle],
+                name=particle.capitalize(),
+                line_color=color,
+            ),
+            row=1,
+            col=2 if particle == "pions" else 1
+        )
 
     fig.update_xaxes(title_text="Radius (Coefficient)")
-
-    # Range [a,b] is defined by [10^a, 10^b], hence passing to log
-    fig.update_yaxes(type="log", range=[np.log10(0.97), np.log10(1.001)])
 
     fig.update_layout(
         title_text="Efficiency/Radius",

@@ -134,6 +134,7 @@ varGeometry:
     part: 'waferpart'
 
 clusterStudies:
+  local: True
   localDir: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/
   ehleDir: /eos/user/i/iehle/
   dataFolder: data/
@@ -141,9 +142,19 @@ clusterStudies:
   reprocess: True # {True: Process the ROOT file, False: read the .parquet if already processed}
   reinit: True # Run (fill, smooth, seed) tasks
   clusterSizeBaseName: cluster_size
-  coeffs: [0.0, 0.05, 50] # (Min, Max, Total)
-  nevents: -1
+  coeffs: [0.0, 0.05, 50]
+  nevents: 100
   tree: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple/HGCalTriggerNtuple
+  local: False
+  dashApp:
+    PU0:
+      photons: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/photons/cluster/photons_PU0_cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
+      electrons: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
+      pions: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
+    PU200:
+      photons: [/grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/photons/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
+      electrons: []
+      pions: []
 
 base:
   NbinsRz: 42
