@@ -156,7 +156,7 @@ int main(int argc, char **argv)
   int nevents = args["nevents"].as<int>();
 
   std::string particles = get_particles(inpath);
-  out_dir += particles + "/new_skims/";
+  out_dir += particles + "/skims/";
 
   // Grab the file basename from the /full/path
   std::string infile = inpath.substr(inpath.find_last_of("/\\") + 1);
