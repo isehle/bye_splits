@@ -77,6 +77,9 @@ class CondJobBase(JobBatches):
 
         sub_dir = "{}subs/".format(self.particle_dir)
         eos_home = "/eos/user/{}/{}/".format(self.user[0], self.user)
+
+        pileup = "PU0" if "PU0" in self.particle_dir else "PU200"
+
         if not os.path.exists(sub_dir):
             os.makedirs(sub_dir)
         script_basename = os.path.basename(self.script).replace(".sh", "").replace(".py", "")
@@ -92,7 +95,7 @@ class CondJobBase(JobBatches):
         current_version.append("export SITECONFIG_PATH=$VO_CMS_SW_DIR/SITECONF/T2_FR_GRIF_LLR/GRIF-LLR/\n")
         current_version.append("source $VO_CMS_SW_DIR/cmsset_default.sh\n")
         if script_ext == ".sh":
-            current_version.append("bash {} $1".format(self.script)) if self.require_args else current_version.append("bash {}".format(self.script))
+            current_version.append("bash {} $1 $2 $3".format(self.script)) if self.require_args else current_version.append("bash {}".format(self.script))
         elif script_ext == ".py":
             current_version.append("python {} --batch_file $1 --user {}".format(self.script, self.user))
 
@@ -101,11 +104,7 @@ class CondJobBase(JobBatches):
 
     def prepare_multi_job_condor(self):
         log_dir = "{}logs/".format(self.particle_dir)
-        batch_dir = "{}batches/".format(self.particle_dir)
-        batch_script_dir = "{}{}/".format(batch_dir, os.path.splitext(os.path.basename(self.script))[0])
-
-        #batch_files = os.listdir(batch_script_dir)
-        #batch_files = [file for file in batch_files if file.endswith(".txt")]
+        
         batch_files = current_batch_versions
 
         script_basename = os.path.basename(self.script).replace(".sh", "").replace(".py", "")
@@ -121,7 +120,7 @@ class CondJobBase(JobBatches):
         current_version.append("executable = {}\n".format(sub_file))
         current_version.append("Universe              = vanilla\n")
         if self.require_args:
-            current_version.append("Arguments             = $(filename)\n")
+            current_version.append("Arguments             = $(filename) $(particles) $(pileup)\n")
         current_version.append("output = {}{}_C$(Cluster)P$(Process).out\n".format(log_dir, script_basename))
         current_version.append("error = {}{}_C$(Cluster)P$(Process).err\n".format(log_dir, script_basename))
         current_version.append("log = {}{}_C$(Cluster)P$(Process).log\n".format(log_dir, script_basename))
@@ -131,10 +130,10 @@ class CondJobBase(JobBatches):
         current_version.append('+SingularityCmd       = ""\n')
         current_version.append("include: /opt/exp_soft/cms/t3/t3queue |\n")
         if self.require_args:
-            current_version.append("queue filename from (\n")
+            current_version.append("queue filename, particles, pileup from (\n")
+            pileup = "PU0" if "PU0" in batch_files[0] else "PU200"
             for file in batch_files:
-                current_version.append("{}\n".format(file))
-                #current_version.append("{}{}\n".format(batch_script_dir, file))
+                current_version.append("{}, {}, {}\n".format(file, self.particle, pileup))
             current_version.append(")")
 
         # Write the file only if an identical file doesn't already exist
@@ -194,14 +193,13 @@ class CondJob(CondJobBase):
             comm = sub_comm + sub_args
 
         print(str(datetime.now()), " ".join(comm))
-        #status = subprocess.run(comm)
+        status = subprocess.run(comm)
 
 if __name__ == "__main__":    
     with open(params.CfgPath, "r") as afile:
         config = yaml.safe_load(afile)
 
-    #for particle in ("photons", "electrons", "pions"):
-    for particle in ("photons", "electrons"):
+    for particle in ("photons", "electrons", "pions"):
         job = CondJob(particle, config)
         job.prepare_jobs()
         job.launch_jobs()

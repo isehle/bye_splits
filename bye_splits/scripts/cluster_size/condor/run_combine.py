@@ -53,15 +53,17 @@ def combine_files_by_coef(in_dir, file_pattern):
 
 def combine_cluster(cfg):
     nevents = cfg["clusterStudies"]["nevents"]
+    particles = cfg["particles"]
+    pileup = "PU0" if not cfg["clusterStudies"]["pileup"] else "PU200"
 
-    cl_basename = cfg["clusterStudies"]["clusterSizeBaseName"]
+    cl_basename = "{}_{}_{}".format(particles, pileup, cfg["clusterStudies"]["clusterSizeBaseName"])
     
     combine_files_by_coef(params.LocalStorage, cl_basename)
 
     cl_size_out = common.fill_path(cl_basename)
     with pd.HDFStore(cl_size_out, mode="a") as clSizeOut:
         df_gen, _, _ = get_data_reco_chain_start(
-            nevents=nevents, reprocess=False
+            particles=particles, nevents=nevents, reprocess=False
         )
         coef_keys = clSizeOut.keys()
         print("\nNormalizing Files:\n")
@@ -72,4 +74,6 @@ if __name__ == "__main__":
     with open(params.CfgPath, "r") as afile:
         cfg = yaml.safe_load(afile)
 
-    combine_cluster(cfg)
+    for particles in ("photons", "electrons", "pions"):
+        cfg.update({"particles": particles})
+        combine_cluster(cfg)

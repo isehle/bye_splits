@@ -5,12 +5,18 @@ io:
   dirphotons: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
   treephotons: HGCalTriggerNtuple
   filephotons: /data_CMS/cms/ehle/L1HGCAL/PU200/photons/new_skims/skim_tightTC_dRxy_hadd.root
-  direlectrons: hgcalTriggerNtuplizer
+  #direlectrons: hgcalTriggerNtuplizer
+  #treeelectrons: HGCalTriggerNtuple
+  #fileelectrons: /eos/user/i/iehle/data/PU0/electrons/skim_electrons_0PU_bc_stc_hadd.root
+  #dirpions: hgcalTriggerNtuplizer
+  #treepions: HGCalTriggerNtuple
+  #filepions: /eos/user/i/iehle/data/PU0/pions/skim_pions_0PU_new_hadd.root
+  direlectrons: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
   treeelectrons: HGCalTriggerNtuple
-  fileelectrons: /eos/user/i/iehle/data/PU0/electrons/skim_electrons_0PU_bc_stc_hadd.root
-  dirpions: hgcalTriggerNtuplizer
+  fileelectrons: /data_CMS/cms/ehle/L1HGCAL/PU0/electrons/skims/skim_tightTC_dRxy_electrons_0PU_bc_stc_hadd.root
+  dirpions: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
   treepions: HGCalTriggerNtuple
-  filepions: /eos/user/i/iehle/data/PU0/pions/skim_pions_0PU_new_hadd.root
+  filepions: /data_CMS/cms/ehle/L1HGCAL/PU0/pions/skims/skim_tightTC_dRxy_pions_0PU_bc_stc_hadd.root
 
 geometry:
     dir: L1THGCaltriggergeomtester
@@ -22,7 +28,7 @@ geometry:
     nlayersCEH: 22
   
 selection:
-    particles: photons
+    particles: electrons
     disconnectedTriggerLayers: [2,4,6,8,10,12,14,16,18,20,22,24,26,28]
     reachedEE: 2
     deltarThreshold: 0.05
@@ -50,15 +56,15 @@ job:
   require_args: True
   read_dir: False # If False, read the file paths stored on the .txt files below
   photons:
-    submit_dir: /data_CMS/cms/ehle/L1HGCAL/PU200/photons/
+    submit_dir: /data_CMS/cms/ehle/L1HGCAL/PU0/photons/
     files: /data_CMS/cms/ehle/L1HGCAL/PU200/coefs.txt
     files_per_batch: 10
   electrons:
-    submit_dir: /data_CMS/cms/ehle/L1HGCAL/PU200/electrons/
+    submit_dir: /data_CMS/cms/ehle/L1HGCAL/PU0/electrons/
     files: /data_CMS/cms/ehle/L1HGCAL/PU200/coefs.txt
     files_per_batch: 10
   pions:
-    submit_dir: /data_CMS/cms/ehle/L1HGCAL/PU200/pions/
+    submit_dir: /data_CMS/cms/ehle/L1HGCAL/PU0/pions/
     files: /data_CMS/cms/ehle/L1HGCAL/PU200/coefs.txt
     files_per_batch: 10
 
@@ -121,8 +127,9 @@ clusterStudies:
   localDir: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/
   ehleDir: /eos/user/i/iehle/
   dataFolder: data/
+  pileup: False
   reprocess: False # {True: Process the ROOT file, False: read the .parquet if already processed}
-  reinit: True # Run (fill, smooth, seed) tasks
+  reinit: False # Run (fill, smooth, seed) tasks
   clusterSizeBaseName: cluster_size
   coeffs: [0.0, 0.05, 50] # (Min, Max, Total)
   nevents: -1

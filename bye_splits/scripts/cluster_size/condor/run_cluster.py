@@ -23,6 +23,8 @@ import yaml
 def cluster_coef(pars, cfg):
     cluster_d = params.read_task_params("cluster")
 
+    particles = pars["particles"]
+    pileup = pars["pileup"]
     coef = float(pars["coef"])
 
     cl_size_coef = "{}_coef_{}".format(
@@ -32,11 +34,16 @@ def cluster_coef(pars, cfg):
     cluster_d["ClusterOutPlot"], cluster_d["ClusterOutValidation"] = cl_size_coef, cl_size_coef+"_valid"
     cluster_d["CoeffA"] = [coef, 0] * 50
 
+    for key in ("ClusterInTC", "ClusterInSeeds", "ClusterOutPlot", "ClusterOutValidation"):
+        name = cluster_d[key]
+        cluster_d[key] =  "{}_{}_{}".format(particles, pileup, name)
     nevents_end = tasks.cluster.cluster_default(pars, **cluster_d)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--coef", help="Coefficient to use as the max cluster radius", required=True)
+    parser.add_argument("--particles", choices=("photons", "electrons", "pions"), required=True)
+    parser.add_argument("--pileup", help="tag for PU200 vs PU0", choices=("PU0", "PU200"), required=True)
     parsing.add_parameters(parser)
     FLAGS = parser.parse_args()
 
