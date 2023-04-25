@@ -54,7 +54,7 @@ job:
   local: False
   script: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/bye_splits/production/submit_scripts/condor_cluster_size.sh
   require_args: True
-  read_dir: False # If False, read the file paths stored on the .txt files below
+  read_dir: False # {True: read arguments as paths in <submit_dir>, False: read arguments stored on the .txt <files>}
   photons:
     submit_dir: /data_CMS/cms/ehle/L1HGCAL/PU0/photons/
     files: /data_CMS/cms/ehle/L1HGCAL/PU200/coefs.txt
