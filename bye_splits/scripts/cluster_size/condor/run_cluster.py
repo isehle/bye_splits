@@ -32,7 +32,7 @@ def cluster_coef(pars, cfg):
         str(round(coef, 3)).replace(".", "p"),
     )
     cluster_d["ClusterOutPlot"], cluster_d["ClusterOutValidation"] = cl_size_coef, cl_size_coef+"_valid"
-    cluster_d["CoeffA"] = [coef, 0] * 50
+    cluster_d["CoeffA"] = [coef] * 50
 
     for key in ("ClusterInTC", "ClusterInSeeds", "ClusterOutPlot", "ClusterOutValidation"):
         name = cluster_d[key]
