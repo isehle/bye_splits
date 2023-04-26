@@ -23,18 +23,23 @@ import sys
 import yaml
 from tqdm import tqdm
 
-def normalize_df(cl_df, gen_df):
-    cl_df["pt"] = cl_df["en"] / np.cosh(cl_df["eta"])
-    gen_df["gen_pt"] = gen_df["gen_en"] / np.cosh(gen_df["gen_eta"])
-
-    cl_df = cl_df.set_index("event").join(
+def normalize_df(cl_df, gen_df, dRThresh):
+    combined_df = cl_df.set_index("event").join(
         gen_df.set_index("event"), on="event", how="inner"
     )
 
-    cl_df["pt_norm"] = cl_df["pt"] / cl_df["gen_pt"]
-    cl_df["en_norm"] = cl_df["en"] / cl_df["gen_en"]
+    combined_df["dR"] = np.sqrt((combined_df["eta"]-combined_df["gen_eta"])**2+(combined_df["phi"]-combined_df["gen_phi"])**2)
+    combined_df["matches"] = combined_df["dR"] <= 0.05
 
-    return cl_df
+
+    combined_df["pt"] = combined_df["en"] / np.cosh(combined_df["eta"])
+    combined_df["gen_pt"] = combined_df["gen_en"] / np.cosh(combined_df["gen_eta"])
+
+
+    combined_df["pt_norm"] = combined_df["pt"] / combined_df["gen_pt"]
+    combined_df["en_norm"] = combined_df["en"] / combined_df["gen_en"]
+
+    return combined_df
 
 
 def combine_files_by_coef(in_dir, file_pattern):
@@ -42,7 +47,7 @@ def combine_files_by_coef(in_dir, file_pattern):
         file for file in os.listdir(in_dir) if re.search(file_pattern, file) != None
     ]
     coef_pattern = r"coef_0p(\d+)"
-    out_path = common.fill_path(file_pattern)
+    out_path = common.fill_path(file_pattern, data_dir=in_dir)
     with pd.HDFStore(out_path, "w") as clusterSizeOut:
         print("\nCombining Files:\n")
         for file in tqdm(files):
@@ -56,19 +61,20 @@ def combine_cluster(cfg):
     particles = cfg["particles"]
     pileup = "PU0" if not cfg["clusterStudies"]["pileup"] else "PU200"
 
-    cl_basename = "{}_{}_{}".format(particles, pileup, cfg["clusterStudies"]["clusterSizeBaseName"])
-    
-    combine_files_by_coef(params.LocalStorage, cl_basename)
+    dir = "{}/{}/{}/cluster/".format(params.LocalStorage, pileup, particles)
+    cl_size_out = common.fill_path(cfg["clusterStudies"]["clusterSizeBaseName"], data_dir=dir)
 
-    cl_size_out = common.fill_path(cl_basename)
+    combine_files_by_coef(dir, cfg["clusterStudies"]["clusterSizeBaseName"])
+
     with pd.HDFStore(cl_size_out, mode="a") as clSizeOut:
         df_gen, _, _ = get_data_reco_chain_start(
             particles=particles, nevents=nevents, reprocess=False
         )
+        dRthresh = cfg["selection"]["deltarThreshold"]
         coef_keys = clSizeOut.keys()
         print("\nNormalizing Files:\n")
         for coef in tqdm(coef_keys[1:]):
-            clSizeOut[coef] = normalize_df(clSizeOut[coef], df_gen)
+            clSizeOut[coef] = normalize_df(clSizeOut[coef], df_gen, dRthresh)
 
 if __name__ == "__main__":
     with open(params.CfgPath, "r") as afile:
