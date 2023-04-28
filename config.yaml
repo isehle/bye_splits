@@ -253,3 +253,28 @@ seed_roi:
   SeedOut: 'seed_roi'
   histoThreshold: 20.
   hexDist: True
+
+plot:
+  radius: 0.01
+  baseName: cluster_size
+  plotName: tc_occupancy
+  PU0:
+    photons:
+      files: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/photons/cluster/photons_PU0_cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
+      events: []
+    electrons:
+      files: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
+      events: []
+    pions:
+      files: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
+      events: [11949, 4226, 12612]
+  PU200:
+    photons:
+      files: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/photons/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
+      events: [5284, 183503, 1545]
+    electrons:
+      files: []
+      events: []    
+    pions:
+      files: []
+      events: []

@@ -208,3 +208,14 @@ def remove_nans(arrs):
 
     return cleaned_arrays
 
+# TEMPORARY SOLUTION, I BELIEVE THIS HAS BEEN UPDATED ELSEWHERE
+def tc_base_selection(df, range_rz):
+
+    df['R'] = np.sqrt(df.tc_x*df.tc_x + df.tc_y*df.tc_y)
+    df['Rz'] = df.R / abs(df.tc_z)
+
+    #the following cut removes almost no event at all
+    df = df[ ((df['Rz'] < range_rz[1]) &
+              (df['Rz'] > range_rz[0])) ]
+
+    return df

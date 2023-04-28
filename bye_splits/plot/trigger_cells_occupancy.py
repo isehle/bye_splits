@@ -12,7 +12,6 @@ to describe the full phase space and the one defined ("selected") by `pars["regi
 _all_ = [ ]
 
 import os
-from pathlib import Path
 import sys
 parent_dir = os.path.abspath(__file__ + 3 * '/..')
 sys.path.insert(0, parent_dir)
@@ -26,10 +25,12 @@ import uproot as up
 import random
 import h5py
 import yaml
-#from bokeh.io import export_png
+
+from bye_splits.data_handle import data_process
+from bye_splits.data_handle.geometry import GeometryData
 
 from bokeh.io import output_file, show, save
-from bokeh.layouts import layout, row
+from bokeh.layouts import layout
 from bokeh.models import (BasicTicker, ColorBar, ColumnDataSource,
                           LogColorMapper, LogTicker,
                           LinearColorMapper, BasicTicker,
@@ -52,96 +53,87 @@ def set_figure_props(p, hide_legend=True):
     if hide_legend:
         p.legend.click_policy='hide'
     
-def plot_trigger_cells_occupancy(pars, **kw):
-    #assumes the binning is regular
-    binDistRz = kw['MaxROverZ'] - kw['MinROverZ'] 
-    binDistPhi = kw["MaxPhi"] - kw["MinPhi"]
+def plot_trigger_cells_occupancy(pars, **cfg):
+    particles = pars.particles
+    pileup_dir = "PU0" if not pars.pileup else "PU200"
+    particle_dir = "{}/{}/{}".format(params.LocalStorage, pileup_dir, particles)
+    filename_template = lambda name: "{}_{}_{}".format(particles, pileup_dir, name)
+
+    #_, _, tcData = data_process.get_data_reco_chain_start(nevents=pars.nevents, reprocess=False)
+    _, _, tcData = data_process.get_data_reco_chain_start(nevents=-1, reprocess=False)
+
+    rz_bins = np.linspace(cfg["base"]["MinROverZ"], cfg["base"]["MaxROverZ"], cfg["base"]["NbinsRz"])
+    phi_bins = np.linspace(cfg["base"]["MinPhi"], cfg["base"]["MaxPhi"], cfg["base"]["NbinsPhi"])
+    
+    # Requires regular binning
+    binDistRz = rz_bins[1] - rz_bins[0]
+    binDistPhi = phi_bins[1] - phi_bins[0]
     binConv = lambda vals,dist,amin : (vals*dist) + (dist/2) + amin
 
     SHIFTH, SHIFTV = 3*binDistPhi, binDistRz
 
-    #tcDataPath = os.path.join(params.LocalStorage, 'test_triggergeom.root')
-    tcDataPath = "/data_CMS/cms/alves/L1HGCAL/test_triggergeom.root"
-    tcFile = up.open(tcDataPath)
+    simDataPath = cfg["plot"][pileup_dir][particles]["files"][0]
+    _, simAlgoFiles, simAlgoPlots = ({} for _ in range(3))
 
-    tcFolder = 'hgcaltriggergeomtester'
-    tcTreeName = 'TreeTriggerCells'
-    tcTree = tcFile[ os.path.join(tcFolder, tcTreeName) ]
-
-    #simDataPath = os.path.join(params.LocalStorage, 'summ_photon_truncation.hdf5') # SHOULD BE FILL IN STEP——most likely replaced by df_gen returned by *_chain_debug.parquet
-    simDataPath = "data/new_algos/tests_pu0/cluster_plot_ThresholdDummyHistomaxnoareath20_SEL_all_REG_Si_SW_1_SK_default_CA_min_distance.hdf5"
-    simAlgoDFs, simAlgoFiles, simAlgoPlots = ({} for _ in range(3))
-
-    fe = kw["FesAlgo"]
+    fe = cfg["base"]["FesAlgo"]
     simAlgoFiles[fe] = [ os.path.join(simDataPath) ]
 
-    title_common = r'{} vs {} bins'.format(kw['NbinsPhi'], kw['NbinsRz'])
-    """if pos_endcap:
-        title_common += '; Positive end-cap only'"""
-    title_common += '; Positive end-cap only'
-    title_common += '; Min(R/z)={} and Max(R/z)={}'.format(kw['MinROverZ'],
-                                                           kw['MaxROverZ'])
+    title_common = r"{} vs {} bins".format(cfg["base"]["NbinsPhi"], cfg["base"]["NbinsRz"])
+    if pars.pos_endcap:
+        title_common += '; Positive end-cap only'
+    title_common += '; Min(R/z)={} and Max(R/z)={}'.format(cfg["base"]['MinROverZ'],
+                                                           cfg["base"]['MaxROverZ'])
 
     mypalette = _palette(50)
 
     # Inputs: Trigger Cells
-    tcVariables = {'zside', 'subdet', 'layer', 'phi', 'eta', 'x', 'y', 'z', 'id'}
-    assert(tcVariables.issubset(tcTree.keys()))
-    tcVariables = list(tcVariables)
-    tcData = tcTree.arrays(tcVariables, library='pd')
-
-    # Inputs: Simulation 0 Pu Photons
-    for fe,files in simAlgoFiles.items():
-        name = fe
-        dfs = []
-        for afile in files:
-            with pd.HDFStore(afile, mode='r') as store:
-                dfs.append(store[name])
-        simAlgoDFs[fe] = pd.concat(dfs)
-
-    simAlgoNames = sorted(simAlgoDFs.keys())
+    tcVariables = {"tc_layer", "tc_phi", "tc_eta", "tc_x", "tc_y", "tc_z", "tc_multicluster_id"}
+    assert(tcVariables.issubset(tcData.keys()))
 
     # Inputs: Cluster After Custom Iterative Algorithm
-    outclusterplot = common.fill_path(params.cluster_kw['ClusterOutPlot'], **pars)
+    cluster_dir = "{}/cluster/".format(particle_dir)
+    if not pars.pileup:
+        file_name = filename_template(cfg["plot"]["baseName"])
+        file_name += "_coef_{}".format(str(cfg["plot"]["radius"]).replace(".","p"))
+    else:
+        file_name = "{}_coef_{}".format(cfg["plot"]["baseName"],str(cfg["plot"]["radius"]).replace(".","p"))
+    
+    outclusterplot = common.fill_path(file_name, data_dir=cluster_dir, **pars)
     with pd.HDFStore(outclusterplot, mode='r') as store:
         splittedClusters_3d_local = store['data']
 
-    # Antiquated: the base selection is done in the skimming step now
-    '''tcData, subdetCond = common.tc_base_selection(tcData,
-                                                  pos_endcap=pos_endcap,
-                                                  region=pars['reg'],
-                                                  range_rz=(kw['MinROverZ'],
-                                                            kw['MaxROverZ']))'''
-    
-    tcData, subdetCond = common.get_detector_region_mask(tcData, region=pars.reg)
-    tcData.id = np.uint32(tcData.id)
+    tcData= common.tc_base_selection(tcData,
+                                     range_rz=(cfg["base"]['MinROverZ'],
+                                              cfg["base"]['MaxROverZ']))
 
     tcData_full = tcData[:]
-    tcData_sel = tcData[subdetCond]
+    #tcData_sel = tcData[subdetCond]
 
     copt = dict(labels=False)
-
-    tcData_full['Rz_bin'] = pd.cut(tcData_full['Rz'],
-                                   bins=kw['RzBinEdges'],
-                                   **copt)
-    tcData_full['phi_bin'] = pd.cut(tcData_full.phi,
-                                    bins=kw['PhiBinEdges'],
+    with common.SupressSettingWithCopyWarning():
+        tcData_full['Rz_bin'] = pd.cut(tcData_full['Rz'],
+                                    bins=rz_bins,
                                     **copt)
-    tcData_sel['Rz_bin'] = pd.cut(tcData_sel['Rz'],
-                                  bins=kw['RzBinEdges'],
-                                  **copt)
-    tcData_sel['phi_bin'] = pd.cut(tcData_sel.phi,
-                                   bins=kw['PhiBinEdges'],
-                                   **copt)
-    
-    # Convert bin ids back to values (central values in each bin)
-    tcData_full['Rz_center'] = binConv(tcData_full.Rz_bin, binDistRz, kw['MinROverZ'])
-    tcData_full['phi_center'] = binConv(tcData_full.phi_bin, binDistPhi, kw['MinPhi'])
-    tcData_sel['Rz_center'] = binConv(tcData_sel.Rz_bin, binDistRz, kw['MinROverZ'])
-    tcData_sel['phi_center'] = binConv(tcData_sel.phi_bin, binDistPhi, kw['MinPhi'])
-    _cols_drop = ['Rz_bin', 'phi_bin', 'Rz', 'phi']
-    tcData_full = tcData_full.drop(_cols_drop, axis=1)
-    tcData_sel = tcData_sel.drop(_cols_drop, axis=1)
+        tcData_full['phi_bin'] = pd.cut(tcData_full['tc_phi'],
+                                        bins=phi_bins,
+                                        **copt)
+
+        '''tcData_sel['Rz_bin'] = pd.cut(tcData_sel['Rz'],
+                                    bins=rz_bins,
+                                    **copt)
+        tcData_sel['phi_bin'] = pd.cut(tcData_sel['phi'],
+                                    bins=phi_bins,
+                                    **copt)'''
+        
+        # Convert bin ids back to values (central values in each bin)
+        tcData_full['Rz_center'] = binConv(tcData_full.Rz_bin, binDistRz, cfg["base"]['MinROverZ'])
+        tcData_full['phi_center'] = binConv(tcData_full.phi_bin, binDistPhi, cfg["base"]['MinPhi'])
+        '''tcData_sel['Rz_center'] = binConv(tcData_sel.Rz_bin, binDistRz, cfg["base"]['MinROverZ'])
+        tcData_sel['phi_center'] = binConv(tcData_sel.phi_bin, binDistPhi, cfg["base"]['MinPhi'])'''
+
+        _cols_drop = ['Rz_bin', 'phi_bin', 'Rz', 'tc_phi']
+        tcData_full = tcData_full.drop(_cols_drop, axis=1)
+        #tcData_sel = tcData_sel.drop(_cols_drop, axis=1)
 
     # if `-1` is included in pars["ledges"], the full selection is also drawn
     try:
@@ -157,22 +149,22 @@ def plot_trigger_cells_occupancy(pars, **kw):
     grps_f, grps_s = ([] for _ in range(2))
     for lmin,lmax in ledgeszip:
         #full
-        grps_f.append( tcData_full[ (tcData_full.layer>lmin) &
-                                    (tcData_full.layer<=lmax) ] )
+        grps_f.append( tcData_full[ (tcData_full.tc_layer>lmin) &
+                                    (tcData_full.tc_layer<=lmax) ] )
         groupby_full = grps_f[-1].groupby(['Rz_center', 'phi_center'],
                                           as_index=False)
         grps_f[-1] = groupby_full.count()
-        eta_mins = groupby_full.min()['eta']
-        eta_maxs = groupby_full.max()['eta']
+        eta_mins = groupby_full.min()['tc_eta']
+        eta_maxs = groupby_full.max()['tc_eta']
         grps_f[-1].insert(0, 'min_eta', eta_mins)
         grps_f[-1].insert(0, 'max_eta', eta_maxs)
-        grps_f[-1] = grps_f[-1].rename(columns={'z': 'ntc'})
+        grps_f[-1] = grps_f[-1].rename(columns={'tc_z': 'ntc'})
         _cols_keep = ['phi_center', 'ntc', 'Rz_center',
                       'min_eta', 'max_eta']
         grps_f[-1] = grps_f[-1][_cols_keep]
 
         #sel
-        grps_s.append( tcData_sel[ (tcData_sel.layer>lmin) &
+        '''grps_s.append( tcData_sel[ (tcData_sel.layer>lmin) &
                                     (tcData_sel.layer<=lmax) ] )
         groupby_sel = grps_s[-1].groupby(['Rz_center', 'phi_center'],
                                           as_index=False)
@@ -184,21 +176,23 @@ def plot_trigger_cells_occupancy(pars, **kw):
         grps_s[-1] = grps_s[-1].rename(columns={'z': 'ntc'})
         _cols_keep = ['phi_center', 'ntc', 'Rz_center',
                       'min_eta', 'max_eta']
-        grps_s[-1] = grps_s[-1][_cols_keep]
+        grps_s[-1] = grps_s[-1][_cols_keep]'''
+    
 
     #########################################################################
     ################### DATA ANALYSIS: SIMULATION ###########################
     #########################################################################
-    for i,fe in enumerate(kw['FesAlgos']):
 
-        outfillplot = common.fill_path(kw['FillOutPlot'], **pars)
-        with pd.HDFStore(outfillplot, mode='r') as store:
-            splittedClusters_3d_cmssw = store[fe + '_3d']
-            splittedClusters_tc = store[fe + '_tc']
+    #fillplot_template = "{}_{}_{}".format(particles, pileup_dir, cfg["fill"]["FillOutPlot"])
+    fillplot_template = filename_template(cfg["fill"]["FillOutPlot"])
+    outfillplot = common.fill_path(fillplot_template, data_dir=particle_dir, **pars)
+    with pd.HDFStore(outfillplot, mode='r') as store:
+        splittedClusters_3d_cmssw = store[fe + '_3d']
+        splittedClusters_tc = store[fe + '_tc']
 
-        simAlgoPlots[fe] = (splittedClusters_3d_cmssw,
-                            splittedClusters_tc,
-                            splittedClusters_3d_local )
+    simAlgoPlots[fe] = (splittedClusters_3d_cmssw,
+                        splittedClusters_tc,
+                        splittedClusters_3d_local )
 
     #########################################################################
     ################### PLOTTING: TRIGGER CELLS #############################
@@ -206,15 +200,15 @@ def plot_trigger_cells_occupancy(pars, **kw):
     bckg_full, bckg_sel = ([] for _ in range(2))
     for idx,(grp_full,grp_sel) in enumerate(zip(grps_f,grps_s)):
         source_full = ColumnDataSource(grp_full)
-        source_sel  = ColumnDataSource(grp_sel)
+        #source_sel  = ColumnDataSource(grp_sel)
 
-        mapper_class = LogColorMapper if pars.log else LinearColorMapper
+        mapper_class = LogColorMapper if pars.log_scale else LinearColorMapper
         mapper = mapper_class(palette=mypalette,
                               low=grp_full['ntc'].min(),
                               high=grp_full['ntc'].max())
 
         title = title_common + '; {}'.format(tcSelections[idx])
-        fig_opt = dict(title=title,
+        '''fig_opt = dict(title=title,
                        width=1800,
                        height=600,
                        x_range=Range1d(tcData_full.phi_center.min()-SHIFTH,
@@ -224,14 +218,22 @@ def plot_trigger_cells_occupancy(pars, **kw):
                        tools="hover,box_select,box_zoom,reset,save",
                        x_axis_location='below',
                        x_axis_type='linear',
+                       y_axis_type='linear')'''
+        
+        fig_opt = dict(title=title,
+                       width=1800,
+                       height=600,
+                       tools="hover,box_select,box_zoom,reset,save",
+                       x_axis_location='below',
+                       x_axis_type='linear',
                        y_axis_type='linear')
 
         p_full = figure(**fig_opt)
         p_full.output_backend = 'svg'
         p_full.toolbar.logo = None
-        p_sel  = figure(**fig_opt)
+        '''p_sel  = figure(**fig_opt)
         p_sel.output_backend = 'svg'
-        p_sel.toolbar.logo = None
+        p_sel.toolbar.logo = None'''
 
         rect_opt = dict(x='phi_center', y='Rz_center',
                         width=binDistPhi, height=binDistRz,
@@ -239,34 +241,35 @@ def plot_trigger_cells_occupancy(pars, **kw):
                         line_color='black',
                         fill_color=transform('ntc', mapper))
         p_full.rect(source=source_full, **rect_opt)
-        p_sel.rect(source=source_sel, **rect_opt)
+        #p_sel.rect(source=source_sel, **rect_opt)
 
         ticker = ( LogTicker(desired_num_ticks=len(mypalette))
-                   if pars.log
+                   if pars.log_scale
                    else BasicTicker(desired_num_ticks=int(len(mypalette)/4)) )
         color_bar = ColorBar(color_mapper=mapper,
                              title='#Hits',
                              ticker=ticker,
                              formatter=PrintfTickFormatter(format="%d"))
         p_full.add_layout(color_bar, 'right')
-        p_sel.add_layout(color_bar, 'right')
+        #p_sel.add_layout(color_bar, 'right')
 
         set_figure_props(p_full, hide_legend=False)
-        set_figure_props(p_sel, hide_legend=False)        
+        #set_figure_props(p_sel, hide_legend=False)        
 
         tooltips = [ ("#TriggerCells", "@{ntc}"),
                      ("min(eta)", "@{min_eta}"),
                      ("max(eta)", "@{max_eta}") ]
         p_full.hover.tooltips = tooltips
-        p_sel.hover.tooltips = tooltips
+        #p_sel.hover.tooltips = tooltips
 
         bckg_full.append( p_full )
-        bckg_sel.append( p_sel )
+        #bckg_sel.append( p_sel )
 
     #########################################################################
     ################### PLOTTING: SIMULATION ################################
     #########################################################################
-    assert len(kw['FesAlgos'])==1
+    # Already true
+    #assert len(kw['FesAlgos'])==1
     ev_panels = [] #pics = []
 
     for _k,(df_3d_cmssw,df_tc,df_3d_local) in simAlgoPlots.items():
@@ -277,53 +280,53 @@ def plot_trigger_cells_occupancy(pars, **kw):
                   'those available in the dataset ({}).'.format(pars.nevents) )
             raise ValueError(m)
         
-        event_sample = ( random.sample(df_tc['event'].unique()
-                                       .astype('int').tolist(),
-                                       pars.nevents)
-                        )
+        event_list = cfg["plot"][pileup_dir][particles]["events"]
+        if len(event_list) == 0:
+            event_sample = ( random.sample(df_tc["event"].unique().astype("int").tolist(),pars.nevents) )
+        else:
+            #event_sample = ( df_tc["event"].unique().astype("int").tolist() )
+            event_sample = event_list
         for ev in event_sample:
             # Inputs: Energy 2D histogram after smoothing but before clustering
-            outsmooth = common.fill_path(params.smooth_kw['SmoothOut'], **pars)
-            with h5py.File(outsmooth, mode='r') as storeSmoothIn:
 
-                kold = kw['FesAlgos'][0]+'_'+str(ev)+'_group_old'
-                energies_post_smooth_old, _, _ = storeSmoothIn[kold]
-                knew = kw['FesAlgos'][0]+'_'+str(ev)+'_group_new'
-                energies_post_smooth_new, _, _ = storeSmoothIn[knew]
+            outsmooth_template = filename_template(cfg["smooth"]["SmoothOut"])
+            outsmooth = common.fill_path(outsmooth_template, data_dir=particle_dir, **pars)
+            with h5py.File(outsmooth, mode='r') as storeSmoothIn:
+                k = fe+'_'+str(ev)+'_group'
+                try:
+                    energies_post_smooth, _, _ = storeSmoothIn[k]
+                except KeyError:
+                    continue
 
             # convert 2D numpy array to (rz_bin, phi_bin) pandas dataframe
-            df_smooth_old = ( pd.DataFrame(energies_post_smooth_old)
+            df_smooth = ( pd.DataFrame(energies_post_smooth)
                               .reset_index()
                               .rename(columns={'index': 'Rz_bin'}) )
-            df_smooth_old = ( pd.melt(df_smooth_old,
+            df_smooth = ( pd.melt(df_smooth,
                                       id_vars='Rz_bin',
                                       value_vars=[x for x in range(0,216)])
-                             .rename(columns={'variable': 'phi_bin', 'value': 'energy_post_smooth_old'}) )
-            df_smooth_old['Rz_center']  = binConv(df_smooth_old.Rz_bin,  binDistRz,  kw['MinROverZ'])
-            df_smooth_old['phi_center'] = binConv(df_smooth_old.phi_bin, binDistPhi, kw['MinPhi'])
-            
-            df_smooth_new = ( pd.DataFrame(energies_post_smooth_new)
-                            .reset_index()
-                            .rename(columns={'index': 'Rz_bin'}) )
-            df_smooth_new = pd.melt(df_smooth_new,
-                                    id_vars='Rz_bin',
-                                    value_vars=[x for x in range(0,216)]).rename(columns={'variable': 'phi_bin', 'value': 'energy_post_smooth_new'})
+                             .rename(columns={'variable': 'phi_bin', 'value': 'energy_post_smooth'}) )
+            df_smooth['Rz_center']  = binConv(df_smooth.Rz_bin,  binDistRz,  cfg["base"]['MinROverZ'])
+            df_smooth['phi_center'] = binConv(df_smooth.phi_bin, binDistPhi, cfg["base"]['MinPhi'])
 
             # do not display empty (or almost empty) bins
-            df_smooth_old = df_smooth_old[ df_smooth_old.energy_post_smooth_old > 0.1 ]
-            df_smooth_new = df_smooth_new[ df_smooth_new.energy_post_smooth_new > 0.1 ]
+            df_smooth = df_smooth[ df_smooth.energy_post_smooth > 0.1 ]
             
-            df_smooth_new['Rz_center']  = binConv(df_smooth_new.Rz_bin,  binDistRz,  kw['MinROverZ'])
-            df_smooth_new['phi_center'] = binConv(df_smooth_new.phi_bin, binDistPhi, kw['MinPhi'])
-
             
             tools = "hover,box_select,box_zoom,reset,save"
+            '''fig_opt = dict(width=900,
+                           height=300,
+                           x_range=Range1d(cfg["base"]['MinPhi']-2*SHIFTH,
+                                           cfg["base"]['MaxPhi']+2*SHIFTH),
+                           y_range=Range1d(cfg["base"]['MinROverZ']-SHIFTV,
+                                           cfg["base"]['MaxROverZ']+SHIFTV),
+                           tools=tools,
+                           x_axis_location='below',
+                           x_axis_type='linear',
+                           y_axis_type='linear')'''
+            
             fig_opt = dict(width=900,
                            height=300,
-                           x_range=Range1d(kw['PhiBinEdges'][0]-2*SHIFTH,
-                                           kw['PhiBinEdges'][-1]+2*SHIFTH),
-                           y_range=Range1d(kw['RzBinEdges'][0]-SHIFTV,
-                                           kw['RzBinEdges'][-1]+SHIFTV),
                            tools=tools,
                            x_axis_location='below',
                            x_axis_type='linear',
@@ -333,65 +336,53 @@ def plot_trigger_cells_occupancy(pars, **kw):
             ev_3d_cmssw = df_3d_cmssw[ df_3d_cmssw.event == ev ]
             ev_3d_local = df_3d_local[ df_3d_local.event == ev ]
 
-            tc_cols = [ 'tc_mipPt', 'tc_z', 'tc_id',
-                        'tc_eta', 'tc_eta_new', 
-                        'phi_old', 'phi_new',
-                        'Rz', 'Rz_bin', 'tc_phi_bin_old', 'tc_phi_bin_new',
-                        'genpart_exeta', 'genpart_exphi' ]
+            tc_cols = [ 'tc_mipPt', 'tc_z', 'tc_multicluster_id',
+                        'tc_eta',
+                        'tc_phi',
+                        'Rz', 'Rz_bin', 'tc_phi_bin',
+                      ]
             ev_tc = ev_tc.filter(items=tc_cols)
 
             copt = dict(labels=False)
 
             # Convert bin ids back to values (central values in each bin)
-            ev_tc['Rz_center'] = binConv(ev_tc.Rz_bin, binDistRz, kw['MinROverZ'])
-            ev_tc['phi_center_old'] = binConv(ev_tc.tc_phi_bin_old, binDistPhi,
-                                              kw['MinPhi'])
-            ev_tc['phi_center_new'] = binConv(ev_tc.tc_phi_bin_new, binDistPhi,
-                                              kw['MinPhi'])
-            _cols_drop = ['Rz_bin', 'tc_phi_bin_old', 'tc_phi_bin_new', 'Rz', 'phi_new']
+            ev_tc['Rz_center'] = binConv(ev_tc.Rz_bin, binDistRz, cfg["base"]['MinROverZ'])
+            ev_tc['phi_center'] = binConv(ev_tc.tc_phi_bin, binDistPhi,
+                                              cfg["base"]['MinPhi'])
+
+
+            _cols_drop = ['Rz_bin', 'tc_phi_bin', 'Rz']
             ev_tc = ev_tc.drop(_cols_drop, axis=1)
 
             with common.SupressSettingWithCopyWarning():
                 ev_3d_cmssw['cl3d_Roverz']=common.calcRzFromEta(ev_3d_cmssw.cl3d_eta)
-                ev_3d_cmssw['gen_Roverz']=common.calcRzFromEta(ev_3d_cmssw.genpart_exeta)
+                ev_3d_cmssw['gen_Roverz']=common.calcRzFromEta(ev_3d_cmssw.gen_eta)
 
             cl3d_pos_rz  = ev_3d_cmssw['cl3d_Roverz'].unique()
             cl3d_pos_phi = ev_3d_cmssw['cl3d_phi'].unique()
             gen_pos_rz   = ev_3d_cmssw['gen_Roverz'].unique()
-            gen_pos_phi  = ev_3d_cmssw['genpart_exphi'].unique()
+            gen_pos_phi  = ev_3d_cmssw['gen_phi'].unique()
             drop_cols = ['cl3d_Roverz', 'cl3d_eta', 'cl3d_phi']
             ev_3d_cmssw = ev_3d_cmssw.drop(drop_cols, axis=1)
             assert( len(gen_pos_rz) == 1 and len(gen_pos_phi) == 1 )
 
-            groupby_old = ev_tc.groupby(['Rz_center',
-                                         'phi_center_old'],
+            groupby = ev_tc.groupby(['Rz_center',
+                                         'phi_center'],
                                         as_index=False)
-            groupby_new = ev_tc.groupby(['Rz_center',
-                                         'phi_center_new'],
-                                        as_index=False)
-            group_old = groupby_old.count()
-            group_new = groupby_new.count()
+            group = groupby.count()
 
-            _ensum = ( groupby_old.sum()['tc_mipPt'],
-                       groupby_new.sum()['tc_mipPt'] )
-            _etamins = ( groupby_old.min()['tc_eta'],
-                         groupby_new.min()['tc_eta_new'] )
-            _etamaxs = ( groupby_old.max()['tc_eta'],
-                         groupby_new.max()['tc_eta_new'] )
+            _ensum = groupby.sum()['tc_mipPt']
+            _etamins = groupby.min()['tc_eta']
+            _etamaxs = groupby.max()['tc_eta']
 
-            group_old = group_old.rename(columns={'tc_z': 'nhits'})
-            group_old.insert(0, 'min_eta', _etamins[0])
-            group_old.insert(0, 'max_eta', _etamaxs[0])
-            group_old.insert(0, 'sum_en', _ensum[0])
+            group = group.rename(columns={'tc_z': 'nhits'})
+            group.insert(0, 'min_eta', _etamins)
+            group.insert(0, 'max_eta', _etamaxs)
+            group.insert(0, 'sum_en', _ensum)
 
-            group_new = group_new.rename(columns={'tc_z': 'nhits'})
-            group_new.insert(0, 'min_eta', _etamins[1])
-            group_new.insert(0, 'max_eta', _etamaxs[1])
-            group_new.insert(0, 'sum_en', _ensum[1])
-
-            mapper_class = LogColorMapper if pars.log else LinearColorMapper
+            mapper_class = LogColorMapper if pars.log_scale else LinearColorMapper
             ticker = ( LogTicker(desired_num_ticks=len(mypalette))
-                      if pars.log
+                      if pars.log_scale
                       else BasicTicker(desired_num_ticks=int(len(mypalette)/4)) )
             base_bar_opt = dict(ticker=ticker,
                                 formatter=PrintfTickFormatter(format="%d"))
@@ -402,62 +393,35 @@ def plot_trigger_cells_occupancy(pars, **kw):
                              line_color='black' )
 
             seed_window = ( 'phi seeding step window: {}'
-                           .format(params.seed_kw['WindowPhiDim']) )
+                           .format(cfg["optimization"]["WindowSize"]) )
             figs = []
             t_d = {0: ( 'Energy Density (before smoothing step, ' +
                         'before algo, {})'.format(seed_window) ),
-                   1: ( 'Energy Density (before smoothing step, ' +
-                        'after algo, {})'.format(seed_window) ),
-                   2: ( 'Energy Density (after smoothing step, ' +
+                   1: ( 'Energy Density (after smoothing step, ' +
                         'before algo, {})'.format(seed_window) ),
-                   3: ( 'Energy Density (after smoothing step, ' +
-                        'after algo, {})'.format(seed_window) ),
-                   4: ( 'Hit Density (before smoothing step, ' +
-                        'before algo, {})'.format(seed_window) ),
-                   5: ( 'Hit Density (before smoothing step, ' +
-                        'after algo, {})'.format(seed_window) ) }
-            group_d = {0: group_old,
-                       1: group_new,
-                       2: df_smooth_old,
-                       3: df_smooth_new,
-                       4: group_old,
-                       5: group_new }
+                   2: ( 'Hit Density (before smoothing step, ' +
+                        'before algo, {})'.format(seed_window) ), }
+            group_d = {0: group,
+                       1: df_smooth,
+                       2: group,}
             hvar_d = {0: 'sum_en',
-                      1: 'sum_en',
-                      2: 'energy_post_smooth_old',
-                      3: 'energy_post_smooth_new',
-                      4: 'nhits',
-                      5: 'nhits' }
+                      1: 'energy_post_smooth',
+                      2: 'nhits',}
             bvar_d = {0: 'Energy [mipPt]',
                       1: 'Energy [mipPt]',
-                      2: 'Energy [mipPt]',
-                      3: 'Energy [mipPt]',
-                      4: '#Hits',
-                      5: '#Hits' }
+                      2: '#Hits',}
             toolvar_d = {0: ('EnSum', '@{sum_en}'),
-                         1: ('EnSum', '@{sum_en}'),
-                         2: ('EnSum', '@{energy_post_smooth_old}'),
-                         3: ('EnSum', '@{energy_post_smooth_new}'),
-                         4: ('#hits', '@{nhits}'),
-                         5: ('#hits', '@{nhits}') }
-            rec_opt_d = {0: dict(x='phi_center_old',
-                                 source=ColumnDataSource(group_old),
+                         1: ('EnSum', '@{energy_post_smooth}'),
+                         2: ('#hits', '@{nhits}'),}
+            rec_opt_d = {0: dict(x='phi_center',
+                                 source=ColumnDataSource(group),
                                  **rect_opt),
-                         1: dict(x='phi_center_new',
-                                 source=ColumnDataSource(group_new),
+                         1: dict(x='phi_center',
+                                 source=ColumnDataSource(df_smooth),
                                  **rect_opt),
                          2: dict(x='phi_center',
-                                 source=ColumnDataSource(df_smooth_old),
-                                 **rect_opt),
-                         3: dict(x='phi_center',
-                                 source=ColumnDataSource(df_smooth_new),
-                                 **rect_opt),
-                         4: dict(x='phi_center_old',
-                                 source=ColumnDataSource(group_old),
-                                 **rect_opt),
-                         5: dict(x='phi_center_new',
-                                 source=ColumnDataSource(group_new),
-                                 **rect_opt) }
+                                 source=ColumnDataSource(group),
+                                 **rect_opt),}
 
             base_cross_opt = dict(size=25, angle=np.pi/4, line_width=4)
             gen_label = 'Gen Particle Position'
@@ -471,7 +435,7 @@ def plot_trigger_cells_occupancy(pars, **kw):
                                    legend_label=cmssw_label,
                                    **base_cross_opt)
             local_label = 'Custom Cluster Position'
-            local_cross_opt = dict(x=ev_3d_local.phinew,
+            local_cross_opt = dict(x=ev_3d_local.phi,
                                    y=ev_3d_local.Rz,
                                    color=colors[2],
                                    legend_label=local_label,
@@ -495,11 +459,8 @@ def plot_trigger_cells_occupancy(pars, **kw):
 
                 figs[-1].hover.tooltips = [ toolvar_d[it] ]
                 figs[-1].cross(**gen_cross_opt)
-
-                if it==1 or it==3 or it==5:
-                    figs[-1].cross(**local_cross_opt)
-                else:
-                    figs[-1].cross(**cmssw_cross_opt)
+                figs[-1].cross(**local_cross_opt)
+                figs[-1].cross(**cmssw_cross_opt)
 
                 set_figure_props(figs[-1])
 
@@ -514,11 +475,14 @@ def plot_trigger_cells_occupancy(pars, **kw):
                 bkg2.cross(**cross2_opt)
 
             #pics.append( (p,ev) )
-            _lay = layout( [[figs[4], figs[5]], [figs[0],figs[1]], [figs[2],figs[3]]] )
+            _lay = layout( [[figs[2]], [figs[0]], [figs[1]]] )
             ev_panels.append( TabPanel(child=_lay,
                                     title='{}'.format(ev)) )
 
-    output_file(pars.plot_name)
+    plot_template_name = filename_template(cfg["plot"]["plotName"])
+    plot_path = common.fill_path(plot_template_name, ext="html", **pars)
+
+    output_file(plot_path)
 
     tc_panels_full, tc_panels_sel = ([] for _ in range(2))
     for i,(bkg1,bkg2) in enumerate(zip(bckg_full,bckg_sel)):
@@ -530,9 +494,8 @@ def plot_trigger_cells_occupancy(pars, **kw):
     lay = layout([[Tabs(tabs=ev_panels)],
                   [Tabs(tabs=tc_panels_sel)],
                   [Tabs(tabs=tc_panels_full)]])
+    
     show(lay) if pars.show_html else save(lay)
-    # for pic,ev in pics:
-    #     export_png(pic, filename=outname+'_event{}.png'.format(ev))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Plot trigger cells occupancy.')
@@ -541,23 +504,18 @@ if __name__ == "__main__":
                         default=True, type=bool)
     parser.add_argument('--show_html', help="Display plot instead of saving", default=False, type=bool)
     parser.add_argument('--hcal', help='Consider HCAL instead of default ECAL.', action='store_true')
+    parser.add_argument('-n', '--nevents', help='number of events to process', type=int, default=5)
+    parser.add_argument('--particles', choices=("photons", "electrons", "pions"), default="photons")
+    parser.add_argument('--pileup', help='plot PU200 instead of PU0', action='store_true')
     parser.add_argument('-l', '--log', help='use color log scale', action='store_true')
-    parser.add_argument('-n', '--nevents', help='number of events to include', type=int, default=-1)
+    parser.add_argument('--show_html', type=bool, default=False)
     parsing.add_parameters(parser)
 
     FLAGS = parser.parse_args()
     pars = common.dot_dict(vars(FLAGS))
-    plot_name = os.path.join(parent_dir, "out", "tcOccupancy.html")
-    pars.update({"plot_name": plot_name})
 
-    with open(params.CfgPath,"r") as file:
+    with open(params.CfgPath, "r") as file:
         cfg = yaml.safe_load(file)
 
-    plot_trigger_cells_occupancy(pars, **cfg["base"])
-
-    # ERROR: standalone does not receive tc_map
-    '''plot_trigger_cells_occupancy(cfg,
-                                 FLAGS.pos_endcap,
-                                 FLAGS.ledges,
-                                 FLAGS.log)'''
+    plot_trigger_cells_occupancy(pars, **cfg)
 
