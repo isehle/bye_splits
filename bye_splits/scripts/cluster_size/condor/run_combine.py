@@ -44,7 +44,7 @@ def normalize_df(cl_df, gen_df, dRThresh):
 
 def combine_files_by_coef(in_dir, file_pattern):
     files = [
-        file for file in os.listdir(in_dir) if re.search(file_pattern, file) != None
+        file for file in os.listdir(in_dir) if re.search(file_pattern, file) != None and "valid" not in file
     ]
     coef_pattern = r"coef_0p(\d+)"
     out_path = common.fill_path(file_pattern, data_dir=in_dir)
