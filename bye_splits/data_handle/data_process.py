@@ -72,8 +72,7 @@ def baseline_selection(df_gen, df_cl, sel, **kw):
 
     return data
 
-
-def get_data_reco_chain_start(particles, nevents=500, reprocess=False, tag="chain"):
+def get_data_reco_chain_start(nevents=500, reprocess=False, tag='chain', particles=None):
     """Access event data."""
     data_part_opt = dict(tag=tag, reprocess=reprocess, debug=True, particles=particles)
     data_particle = EventDataParticle(**data_part_opt)

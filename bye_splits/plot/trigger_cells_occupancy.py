@@ -53,14 +53,15 @@ def set_figure_props(p, hide_legend=True):
     if hide_legend:
         p.legend.click_policy='hide'
     
-def plot_trigger_cells_occupancy(pars, **cfg):
+def plot_trigger_cells_occupancy(pars, tcData, **cfg):
+    radius_str = str(cfg["plot"]["radius"]).replace(".","p")
     particles = pars.particles
     pileup_dir = "PU0" if not pars.pileup else "PU200"
     particle_dir = "{}/{}/{}".format(params.LocalStorage, pileup_dir, particles)
     filename_template = lambda name: "{}_{}_{}".format(particles, pileup_dir, name)
 
     #_, _, tcData = data_process.get_data_reco_chain_start(nevents=pars.nevents, reprocess=False)
-    _, _, tcData = data_process.get_data_reco_chain_start(nevents=-1, reprocess=False)
+    #_, _, tcData = data_process.get_data_reco_chain_start(nevents=-1, reprocess=False, particles=particles)
 
     rz_bins = np.linspace(cfg["base"]["MinROverZ"], cfg["base"]["MaxROverZ"], cfg["base"]["NbinsRz"])
     phi_bins = np.linspace(cfg["base"]["MinPhi"], cfg["base"]["MaxPhi"], cfg["base"]["NbinsPhi"])
@@ -94,9 +95,9 @@ def plot_trigger_cells_occupancy(pars, **cfg):
     cluster_dir = "{}/cluster/".format(particle_dir)
     if not pars.pileup:
         file_name = filename_template(cfg["plot"]["baseName"])
-        file_name += "_coef_{}".format(str(cfg["plot"]["radius"]).replace(".","p"))
+        file_name += "_coef_{}".format(radius_str)
     else:
-        file_name = "{}_coef_{}".format(cfg["plot"]["baseName"],str(cfg["plot"]["radius"]).replace(".","p"))
+        file_name = "{}_coef_{}".format(cfg["plot"]["baseName"],radius_str)
     
     outclusterplot = common.fill_path(file_name, data_dir=cluster_dir, **pars)
     with pd.HDFStore(outclusterplot, mode='r') as store:
@@ -479,7 +480,7 @@ def plot_trigger_cells_occupancy(pars, **cfg):
             ev_panels.append( TabPanel(child=_lay,
                                     title='{}'.format(ev)) )
 
-    plot_template_name = filename_template(cfg["plot"]["plotName"])
+    plot_template_name = filename_template(cfg["plot"]["plotName"]) + "_r{}".format(radius_str)
     plot_path = common.fill_path(plot_template_name, ext="html", **pars)
 
     output_file(plot_path)
@@ -514,8 +515,12 @@ if __name__ == "__main__":
     FLAGS = parser.parse_args()
     pars = common.dot_dict(vars(FLAGS))
 
+    _, _, tcData = data_process.get_data_reco_chain_start(nevents=-1, reprocess=False, particles=pars.particles)
+
     with open(params.CfgPath, "r") as file:
         cfg = yaml.safe_load(file)
 
-    plot_trigger_cells_occupancy(pars, **cfg)
+    for radius in (0.01, 0.02, 0.03, 0.04, 0.05):
+        cfg["plot"]["radius"] = radius
+        plot_trigger_cells_occupancy(pars, tcData, **cfg)
 

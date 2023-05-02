@@ -257,7 +257,7 @@ seed_roi:
 plot:
   radius: 0.01
   baseName: cluster_size
-  plotName: tc_occupancy
+  plotName: tc_occupancy_badEvents
   PU0:
     photons:
       files: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/photons/cluster/photons_PU0_cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
