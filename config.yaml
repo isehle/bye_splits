@@ -267,7 +267,7 @@ plot:
       events: []
     pions:
       files: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
-      events: [11949, 4226, 12612]
+      events: []
   PU200:
     photons:
       files: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/photons/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]

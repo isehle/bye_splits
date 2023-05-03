@@ -216,7 +216,7 @@ def glob_rms(eta_range, pt_cut, normby, pileup, match, file="rms_and_eff"):
 
     pt_cut = "0" if pt_cut=="PT Cut" else pt_cut
 
-    filename = "{}_eta_{}_{}_pt_gtr_{}_{}_newRMS".format(
+    filename = "{}_eta_{}_{}_pt_gtr_{}_{}".format(
         normby, str(eta_range[0]), str(eta_range[1]), pt_cut, file
     )
 

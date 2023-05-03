@@ -239,7 +239,7 @@ def write_eff_file(init_files, norm, coefs, eta, pt_cut, match, file):
     Input("pileup", "n_clicks"),
     Input("match", "n_clicks"),
 )
-def global_effs(eta_range, pt_cut, normby, pileup, match, file="global_NewEff_correct"):
+def global_effs(eta_range, pt_cut, normby, pileup, match, file="global_eff"):
     # even number of clicks --> PU0, odd --> PU200 (will reset with other callbacks otherwise)
     init_files = input_files["PU0"] if pileup%2==0 else input_files["PU200"]
 

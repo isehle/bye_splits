@@ -55,4 +55,4 @@ app.layout = dbc.Container(
 if __name__ == "__main__":
     host, port = "0.0.0.0", 8080
 
-    app.run_server(port=port, host=host)
+    app.run_server(port=port, host=host, debug=True)
