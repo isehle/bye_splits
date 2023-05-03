@@ -101,7 +101,8 @@ class CondJobBase(JobBatches):
             current_version.append("python {} --batch_file $1 --user {}".format(self.script, self.user))
 
         # Write the file only if an identical file doesn't already exist
-        _ = common.conditional_write(submit_file_versions, submit_file_name_template, current_version)
+        global sub_file
+        sub_file = common.conditional_write(submit_file_versions, submit_file_name_template, current_version)
 
     def prepare_multi_job_condor(self):
         log_dir = "{}logs/".format(self.particle_dir)
@@ -110,10 +111,7 @@ class CondJobBase(JobBatches):
 
         script_basename = os.path.basename(self.script).replace(".sh", "").replace(".py", "")
 
-        sub_file = "{}subs/{}_submit.sh".format(self.particle_dir, script_basename)
         job_file_name_template = "{}jobs/{}.sub".format(self.particle_dir, script_basename)
-
-        sub_file = common.grab_most_recent(sub_file)
 
         job_file_versions = common.grab_most_recent(job_file_name_template, return_all=True)
 

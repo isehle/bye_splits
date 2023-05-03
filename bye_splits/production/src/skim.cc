@@ -134,7 +134,12 @@ void skim(std::string tn, std::string inf, std::string outf, std::string particl
   std::vector<std::string> tc_v = join_vars(tc_uintv, tc_intv, tc_floatv);
 
   auto dd1 = dfilt.Define("tc_deltaR", calcDeltaRxy, {vtmp + "_genpart_exeta", vtmp + "_genpart_exphi", "tc_x", "tc_y", "tc_z"});
-  std::string condtc = "tc_zside == 1 && tc_mipPt > " + mipThreshold + " && tc_layer <= 28 && tc_deltaR <= " + std::to_string(pow(tcDeltaRThresh, 2)); // Comparing dR^2 to avoid calculating sqrt
+  std::string condtc = "tc_zside == 1 && tc_mipPt > " + mipThreshold + " && tc_deltaR <= " + std::to_string(pow(tcDeltaRThresh, 2)); // Comparing dR^2 to avoid calculating sqrt
+  if (particle != "pions")
+  {
+    condtc += " && tc_layer <= 28";
+  }
+
   dd1 = dd1.Define(vtmp + "_tcs", condtc);
   for (auto &v : tc_v)
     dd1 = dd1.Define(vtmp + "_" + v, v + "[" + vtmp + "_tcs]");

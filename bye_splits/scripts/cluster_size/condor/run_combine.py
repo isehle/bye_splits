@@ -49,7 +49,7 @@ def combine_files_by_coef(in_dir, file_pattern):
     ]
     coef_pattern = r"coef_0p(\d+)"
     out_path = common.fill_path(file_pattern, data_dir=in_dir)
-
+    breakpoint()
     with pd.HDFStore(out_path, "w") as clusterSizeOut:
         print("\nCombining Files:\n")
         for file in tqdm(files):
