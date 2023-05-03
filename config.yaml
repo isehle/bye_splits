@@ -153,7 +153,7 @@ clusterStudies:
       pions: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
     PU200:
       photons: [/grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/photons/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
-      electrons: []
+      electrons: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/electrons/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
       pions: []
 
 base:
@@ -273,7 +273,7 @@ plot:
       files: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/photons/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
       events: [5284, 183503, 1545]
     electrons:
-      files: []
+      files: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/electrons/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
       events: []    
     pions:
       files: []
