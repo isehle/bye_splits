@@ -16,7 +16,7 @@ io:
   fileelectrons: /data_CMS/cms/ehle/L1HGCAL/PU0/electrons/skims/skim_tightTC_dRxy_electrons_0PU_bc_stc_hadd.root
   dirpions: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
   treepions: HGCalTriggerNtuple
-  filepions: /data_CMS/cms/ehle/L1HGCAL/PU0/pions/skims/skim_tightTC_dRxy_pions_0PU_bc_stc_hadd.root
+  filepions: /data_CMS/cms/ehle/L1HGCAL/PU0/pions/skims/skim_tightTC_dRxy_hadd.root
 
 geometry:
     dir: L1THGCaltriggergeomtester
@@ -54,7 +54,7 @@ job:
   local: False
   script: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/bye_splits/production/submit_scripts/condor_cluster_size.sh
   require_args: True
-  read_dir: False # {True: read arguments as paths in <submit_dir>, False: read arguments stored on the .txt <files>}
+  read_dir: False # {True: read arguments as paths in <submit_dir>/ntuples, False: read arguments stored on the .txt <files>}
   photons:
     submit_dir: /data_CMS/cms/ehle/L1HGCAL/PU0/photons/
     files: /data_CMS/cms/ehle/L1HGCAL/PU200/coefs.txt
@@ -102,8 +102,8 @@ varEvents:
     phi: 'good_cl3d_phi'
     en: 'good_cl3d_energy'
     id: 'good_cl3d_id'
-    # matches: 'matches'
-    # dR: 'deltaR'
+    matches: 'matches'
+    dR: 'deltaR'
     
 varGeometry:
     wu: 'waferu'
@@ -128,8 +128,8 @@ clusterStudies:
   ehleDir: /eos/user/i/iehle/
   dataFolder: data/
   pileup: False
-  reprocess: False # {True: Process the ROOT file, False: read the .parquet if already processed}
-  reinit: False # Run (fill, smooth, seed) tasks
+  reprocess: True # {True: Process the ROOT file, False: read the .parquet if already processed}
+  reinit: True # Run (fill, smooth, seed) tasks
   clusterSizeBaseName: cluster_size
   coeffs: [0.0, 0.05, 50] # (Min, Max, Total)
   nevents: -1

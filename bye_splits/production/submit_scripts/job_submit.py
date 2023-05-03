@@ -96,6 +96,7 @@ class CondJobBase(JobBatches):
         current_version.append("source $VO_CMS_SW_DIR/cmsset_default.sh\n")
         if script_ext == ".sh":
             current_version.append("bash {} $1 $2 $3".format(self.script)) if self.require_args else current_version.append("bash {}".format(self.script))
+            #current_version.append("bash {} $1".format(self.script)) if self.require_args else current_version.append("bash {}".format(self.script))
         elif script_ext == ".py":
             current_version.append("python {} --batch_file $1 --user {}".format(self.script, self.user))
 
@@ -121,6 +122,7 @@ class CondJobBase(JobBatches):
         current_version.append("Universe              = vanilla\n")
         if self.require_args:
             current_version.append("Arguments             = $(filename) $(particles) $(pileup)\n")
+            #current_version.append("Arguments             = $(filename)\n")
         current_version.append("output = {}{}_C$(Cluster)P$(Process).out\n".format(log_dir, script_basename))
         current_version.append("error = {}{}_C$(Cluster)P$(Process).err\n".format(log_dir, script_basename))
         current_version.append("log = {}{}_C$(Cluster)P$(Process).log\n".format(log_dir, script_basename))
@@ -132,8 +134,10 @@ class CondJobBase(JobBatches):
         if self.require_args:
             current_version.append("queue filename, particles, pileup from (\n")
             pileup = "PU0" if "PU0" in batch_files[0] else "PU200"
+            #current_version.append("queue filename from (\n")
             for file in batch_files:
                 current_version.append("{}, {}, {}\n".format(file, self.particle, pileup))
+                #current_version.append("{}\n".format(file))
             current_version.append(")")
 
         # Write the file only if an identical file doesn't already exist

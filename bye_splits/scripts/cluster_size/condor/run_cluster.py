@@ -37,6 +37,7 @@ def cluster_coef(pars, cfg):
     for key in ("ClusterInTC", "ClusterInSeeds", "ClusterOutPlot", "ClusterOutValidation"):
         name = cluster_d[key]
         cluster_d[key] =  "{}_{}_{}".format(particles, pileup, name)
+
     nevents_end = tasks.cluster.cluster_default(pars, **cluster_d)
 
 if __name__ == "__main__":

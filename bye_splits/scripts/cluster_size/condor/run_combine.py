@@ -28,9 +28,10 @@ def normalize_df(cl_df, gen_df, dRThresh):
         gen_df.set_index("event"), on="event", how="inner"
     )
 
-    combined_df["dR"] = np.sqrt((combined_df["eta"]-combined_df["gen_eta"])**2+(combined_df["phi"]-combined_df["gen_phi"])**2)
-    combined_df["matches"] = combined_df["dR"] <= 0.05
-
+    if "dR" not in combined_df.keys():
+        combined_df["dR"] = np.sqrt((combined_df["eta"]-combined_df["gen_eta"])**2+(combined_df["phi"]-combined_df["gen_phi"])**2)
+    if "matches" not in combined_df.keys():
+        combined_df["matches"] = combined_df["dR"] <= dRThresh
 
     combined_df["pt"] = combined_df["en"] / np.cosh(combined_df["eta"])
     combined_df["gen_pt"] = combined_df["gen_en"] / np.cosh(combined_df["gen_eta"])
@@ -48,6 +49,7 @@ def combine_files_by_coef(in_dir, file_pattern):
     ]
     coef_pattern = r"coef_0p(\d+)"
     out_path = common.fill_path(file_pattern, data_dir=in_dir)
+
     with pd.HDFStore(out_path, "w") as clusterSizeOut:
         print("\nCombining Files:\n")
         for file in tqdm(files):

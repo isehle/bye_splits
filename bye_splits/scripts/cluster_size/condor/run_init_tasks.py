@@ -58,6 +58,6 @@ if __name__ == "__main__":
     with open(params.CfgPath, "r") as afile:
         cfg = yaml.safe_load(afile)
 
-    for particles in ("electrons", "pions"):
+    for particles in ("photons", "electrons", "pions"):
         cfg["selection"]["particles"] = particles
         start_chain(common.dot_dict(vars(FLAGS)), cfg)
