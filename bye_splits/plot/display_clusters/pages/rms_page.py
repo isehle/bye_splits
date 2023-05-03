@@ -43,7 +43,7 @@ def effrms(data, c=0.68):
 
     return out
 
-def get_rms(init_files, coef, eta_range, pt_cut, normby, rms_dict=None, rms_eff_dict=None):
+def get_rms(init_files, coef, eta_range, pt_cut, normby, match, rms_dict=None, rms_eff_dict=None):
     dfs_by_particle = cl_helpers.get_dfs(init_files, coef)
     pt_cut = float(pt_cut) if pt_cut!="PT Cut" else 0
 
@@ -51,6 +51,7 @@ def get_rms(init_files, coef, eta_range, pt_cut, normby, rms_dict=None, rms_eff_
 
     new_dict = {}
     for particle, df in dfs_by_particle.items():
+        df = df[ df["matches"] == True] if match%2!=0 else df
         norm = df["en_norm"] if normby == "Energy" else df["pt_norm"]
         rms = norm.std() / norm.mean()
         eff_rms = effrms(norm) / norm.mean()
@@ -85,7 +86,8 @@ layout = dbc.Container(
         ),
         html.Hr(),
         html.Div([dbc.Button("Pile Up", id="pileup", color="primary", n_clicks=0),
-                  dcc.Input(id="pt_cut", value="PT Cut", type='text')]),
+                  dcc.Input(id="pt_cut", value="PT Cut", type='text'),
+                  dbc.Button("dR Matching", id='match', color="primary", n_clicks=0)]),
         html.Hr(),
         dcc.Graph(id="histograms-x-graph", mathjax=True),
         html.P("Coef:"),
@@ -123,15 +125,16 @@ layout = dbc.Container(
     Input("pt_cut","value"),
     Input("normby", "value"),
     Input("pileup", "n_clicks"),
+    Input("match", "n_clicks"),
 )
 
 ##############################################################################################################################
 
 
-def plot_dists(coef, eta_range, pt_cut, normby, pileup):
+def plot_dists(coef, eta_range, pt_cut, normby, pileup, match):
     init_files = input_files["PU0"] if pileup%2==0 else input_files["PU200"]
 
-    data_by_particle = get_rms(init_files, coef, eta_range, pt_cut, normby) # {particle: (df, rms, eff_rms)}
+    data_by_particle = get_rms(init_files, coef, eta_range, pt_cut, normby, match) # {particle: (df, rms, eff_rms)}
     
     fig = go.Figure()
 
@@ -146,7 +149,11 @@ def plot_dists(coef, eta_range, pt_cut, normby, pileup):
         sub_df = df[[col_name, col_name + "_bin"]].reset_index()
         binned_rand_evs = sub_df.groupby(col_name + "_bin")["event"].apply(lambda x: "Random Event: "+str(np.random.choice(x)))
 
-        fig.add_trace(go.Histogram(x=df[col_name], nbinsx=100, autobinx=False, name=particle.capitalize(), hovertext=binned_rand_evs))
+        vals_with_overflow = [np.minimum(1.2, val) for val in df[col_name]]
+        #tick_marks = [str(val) if val != 1.2 else " > 1.2 " for val in vals_with_overflow] # Not currently showing up
+
+        fig.add_trace(go.Histogram(x = vals_with_overflow, nbinsx=100, autobinx=False, name=particle.capitalize(), hovertext=binned_rand_evs))
+        #fig.update_xaxes(ticktext=tick_marks)
 
         gauss_diff = np.abs(eff_rms - rms) / rms
         gauss_str = format(gauss_diff, ".3f")
@@ -174,7 +181,9 @@ def plot_dists(coef, eta_range, pt_cut, normby, pileup):
 
     return fig, val_table
 
-def write_rms_file(init_files, coefs, eta, pt, norm, filename):
+#fig, tab = plot_dists(0.05, [1.6,2.7], 10, "PT", 1, 1)
+
+def write_rms_file(init_files, coefs, eta, pt, norm, match, filename):
     rms_by_part, rms_eff_by_part = {}, {}
     for particle in init_files.keys():
         if len(init_files[particle])>0:
@@ -182,7 +191,7 @@ def write_rms_file(init_files, coefs, eta, pt, norm, filename):
             rms_eff_by_part[particle] = []
 
     for coef in coefs[1:]:
-        get_rms(init_files, coef, eta, pt, norm, rms_by_part, rms_eff_by_part)
+        get_rms(init_files, coef, eta, pt, norm, match, rms_by_part, rms_eff_by_part)
 
     with pd.HDFStore(filename, "w") as glob_rms_file:
         glob_rms_file.put("RMS", pd.DataFrame.from_dict(rms_by_part))
@@ -197,8 +206,9 @@ def write_rms_file(init_files, coefs, eta, pt, norm, filename):
     Input("pt_cut", "value"),
     Input("normby", "value"),
     Input("pileup", "n_clicks"),
+    Input("match", "n_clicks"),
 )
-def glob_rms(eta_range, pt_cut, normby, pileup, file="rms_and_eff"):
+def glob_rms(eta_range, pt_cut, normby, pileup, match, file="rms_and_eff"):
     # even number of clicks --> PU0, odd --> PU200 (will reset with other callbacks otherwise)
     init_files = input_files["PU0"] if pileup%2==0 else input_files["PU200"]
 
@@ -209,6 +219,8 @@ def glob_rms(eta_range, pt_cut, normby, pileup, file="rms_and_eff"):
     filename = "{}_eta_{}_{}_pt_gtr_{}_{}_newRMS".format(
         normby, str(eta_range[0]), str(eta_range[1]), pt_cut, file
     )
+
+    filename += "_matched" if match%2!=0 else ""
 
     filename += "_PU0.hdf5" if pileup%2==0 else "_PU200.hdf5"
     pile_up_dir = "PU0" if pileup%2==0 else "PU200"
@@ -230,7 +242,7 @@ def glob_rms(eta_range, pt_cut, normby, pileup, file="rms_and_eff"):
             ), glob_rms_file["/Eff_RMS"].to_dict(orient="list")
     else:
         rms_by_part, rms_eff_by_part = write_rms_file(
-            init_files, coefs, eta_range, pt_cut, normby, filename_user
+            init_files, coefs, eta_range, pt_cut, normby, match, filename_user
         )
 
     nice_coefs = np.linspace(0.0, 0.05, 50)

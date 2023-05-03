@@ -34,8 +34,8 @@ from bokeh.layouts import layout
 from bokeh.models import (BasicTicker, ColorBar, ColumnDataSource,
                           LogColorMapper, LogTicker,
                           LinearColorMapper, BasicTicker,
-                          PrintfTickFormatter,
-                          Range1d,
+                          PrintfTickFormatter, Slider,
+                          Range1d, CustomJS,
                           TabPanel, Tabs)
 from bokeh.plotting import figure
 from bokeh.transform import transform
@@ -93,15 +93,24 @@ def plot_trigger_cells_occupancy(pars, tcData, **cfg):
 
     # Inputs: Cluster After Custom Iterative Algorithm
     cluster_dir = "{}/cluster/".format(particle_dir)
-    if not pars.pileup:
-        file_name = filename_template(cfg["plot"]["baseName"])
-        file_name += "_coef_{}".format(radius_str)
-    else:
-        file_name = "{}_coef_{}".format(cfg["plot"]["baseName"],radius_str)
+    clusters_3d_local = {}
+    for radius in (0.01, 0.02, 0.03, 0.04, 0.05):
+        r = str(radius.replace("."),"p")
+        if not pars.pileup:
+            file_name = filename_template(cfg["plot"]["baseName"])
+            #file_name += "_coef_{}".format(radius_str)
+            file_name += "_coef_{}".format(r)
+        else:
+            #file_name = "{}_coef_{}".format(cfg["plot"]["baseName"],radius_str)
+            file_name = "{}_coef_{}".format(cfg["plot"]["baseName"],r)
+
+        outclusterplot = common.fill_path(file_name, data_dir=cluster_dir, **pars)
+        with pd.HDFStore(outclusterplot, mode='r') as store:
+            clusters_3d_local[radius] = store['data']
     
-    outclusterplot = common.fill_path(file_name, data_dir=cluster_dir, **pars)
+    '''outclusterplot = common.fill_path(file_name, data_dir=cluster_dir, **pars)
     with pd.HDFStore(outclusterplot, mode='r') as store:
-        splittedClusters_3d_local = store['data']
+        splittedClusters_3d_local = store['data']'''
 
     tcData= common.tc_base_selection(tcData,
                                      range_rz=(cfg["base"]['MinROverZ'],
@@ -191,9 +200,13 @@ def plot_trigger_cells_occupancy(pars, tcData, **cfg):
         splittedClusters_3d_cmssw = store[fe + '_3d']
         splittedClusters_tc = store[fe + '_tc']
 
+    '''simAlgoPlots[fe] = (splittedClusters_3d_cmssw,
+                        splittedClusters_tc,
+                        splittedClusters_3d_local )'''
+    
     simAlgoPlots[fe] = (splittedClusters_3d_cmssw,
                         splittedClusters_tc,
-                        splittedClusters_3d_local )
+                        clusters_3d_local )
 
     #########################################################################
     ################### PLOTTING: TRIGGER CELLS #############################
@@ -335,7 +348,9 @@ def plot_trigger_cells_occupancy(pars, tcData, **cfg):
 
             ev_tc       = df_tc[ df_tc.event == ev ]
             ev_3d_cmssw = df_3d_cmssw[ df_3d_cmssw.event == ev ]
-            ev_3d_local = df_3d_local[ df_3d_local.event == ev ]
+            ev_3d_local = {}
+            for radius, df in df_3d_cmssw.items():
+                ev_3d_local[radius] = df[ df.event == ev ]
 
             tc_cols = [ 'tc_mipPt', 'tc_z', 'tc_multicluster_id',
                         'tc_eta',
@@ -435,12 +450,16 @@ def plot_trigger_cells_occupancy(pars, tcData, **cfg):
                                    color=colors[1],
                                    legend_label=cmssw_label,
                                    **base_cross_opt)
+            # ADD SLIDER FOR RADII
+            slider = Slider(start=0.01, end = 0.05, value=0.01, step=0.01, title="Local Clustering Radius")
+            slider.js_on_change("value", CustomJS(code=""" console.log('slider: value=' + this.value, this.toString())"""))
             local_label = 'Custom Cluster Position'
             local_cross_opt = dict(x=ev_3d_local.phi,
                                    y=ev_3d_local.Rz,
                                    color=colors[2],
                                    legend_label=local_label,
                                     **base_cross_opt)
+            ##################################################
 
             for it in range(len(t_d.keys())):
                 figs.append( figure(title=t_d[it], **fig_opt) )
@@ -480,7 +499,8 @@ def plot_trigger_cells_occupancy(pars, tcData, **cfg):
             ev_panels.append( TabPanel(child=_lay,
                                     title='{}'.format(ev)) )
 
-    plot_template_name = filename_template(cfg["plot"]["plotName"]) + "_r{}".format(radius_str)
+    #plot_template_name = filename_template(cfg["plot"]["plotName"]) + "_r{}".format(radius_str)
+    plot_template_name = "{}_r{}".format(filename_template(cfg["plot"]["plotName"], radius_str))
     plot_path = common.fill_path(plot_template_name, ext="html", **pars)
 
     output_file(plot_path)

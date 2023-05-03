@@ -62,6 +62,32 @@ def binned_effs(df, norm, perc=0.1):
             eff_list = eff
     return eff_list, en_list
 
+def new_binned_effs(df, norm, nbins=100):
+    if nbins!=1:
+        eff = lambda x, y: x/y if y!=0 else 0
+        cl_norm = norm.replace("gen_","")
+
+        bins = np.linspace(min(df[norm]),max(df[norm]), nbins)
+
+        # Create bin columns
+        df[norm+"_bin"] = pd.cut(df[norm], bins=bins, labels=False)
+        df[cl_norm+"_bin"] = pd.cut(df[cl_norm], bins=bins, labels=False)
+
+        # Count values in each bin+event group
+        cl_counts = df.reset_index().groupby(cl_norm+"_bin")["event"].count()
+        gen_counts = df.reset_index().groupby(norm+"_bin")["event"].count()
+
+        # Returns a list of cl_count/gen_count for each bin
+        effs = cl_counts.combine(gen_counts, eff, fill_value=0).tolist()
+    else:
+        """Since by construction there is only one gen particle/event, 
+        repeated gens give us the efficiency/event directly. We then define
+        an efficiency/radius as mean(efficiencies/events) for a given radius."""
+        
+        effs_per_event = df.reset_index().groupby(norm)["event"].count().tolist()
+        effs = np.mean(effs_per_event)
+    
+    return effs, bins if nbins!=1 else effs
 
 # Dash page setup
 ##############################################################################################################################
@@ -85,7 +111,8 @@ layout = dbc.Container(
         ),
         html.Hr(),
         html.Div([dbc.Button("Pile Up", id="pileup", color="primary", n_clicks=0),
-                  dcc.Input(id="pt_cut", value="PT Cut", type='text')]),
+                  dcc.Input(id="pt_cut", value="PT Cut", type='text'),
+                  dbc.Button("dR Matching", id='match', color="primary", n_clicks=0)]),
         html.Hr(),
         dcc.Graph(id="eff-graph", mathjax=True),
         html.P("Coef:"),
@@ -126,11 +153,12 @@ layout = dbc.Container(
     Input("pt_cut", "value"),
     Input("normby", "value"),
     Input("pileup", "n_clicks"),
+    Input("match", "n_clicks"),
 )
 
 ##############################################################################################################################
 
-def display_color(coef, eta_range, pt_cut, normby, pileup):
+def display_color(coef, eta_range, pt_cut, normby, pileup, match):
     # even number of clicks --> PU0, odd --> PU200 (will reset with other callbacks otherwise)
     init_files = input_files["PU0"] if pileup%2==0 else input_files["PU200"]
 
@@ -148,7 +176,9 @@ def display_color(coef, eta_range, pt_cut, normby, pileup):
     glob_eff_dict = {}
     for particle in particles:
         df = df_by_particle[particle]
-        effs, x = binned_effs(df, col_name)
+        df = df[ df["matches"] == True ] if match%2 != 0 else df
+        #effs, x = binned_effs(df, col_name)
+        effs, x = new_binned_effs(df, col_name)
         glob_eff_dict[particle] = np.mean(effs[1:])
         fig.add_trace(
             go.Scatter(
@@ -173,7 +203,9 @@ def display_color(coef, eta_range, pt_cut, normby, pileup):
 
     return fig, dbc.Table.from_dataframe(glob_effs)
 
-def write_eff_file(init_files, norm, coefs, eta, pt_cut, file):
+#fig, tab = display_color(0.05, [1.6,2.7], 10, "PT", 1, 1)
+
+def write_eff_file(init_files, norm, coefs, eta, pt_cut, match, file):
     pt_cut = float(pt_cut) if pt_cut!="PT Cut" else 0
     binned_var = "gen_en" if norm == "Energy" else "gen_pt"
     
@@ -181,13 +213,15 @@ def write_eff_file(init_files, norm, coefs, eta, pt_cut, file):
     for coef in coefs:
         dfs_by_particle = cl_helpers.get_dfs(init_files, coef)
         dfs_by_particle = cl_helpers.filter_dfs(dfs_by_particle, eta, pt_cut)
-
         for particle in dfs_by_particle.keys():
             # Note that a cluster having radius (coef) zero also has zero efficiency, so we initialize as such
             if particle not in effs_dict.keys():
                 effs_dict[particle] = [0.0]
             else:
-                eff, _ = binned_effs(dfs_by_particle[particle], binned_var, 1.0)
+                df = dfs_by_particle[particle]
+                df = df[ df["matches"]==True ] if match%2 !=0 else df
+                #eff, _ = binned_effs(df, binned_var, 1.0)
+                eff = new_binned_effs(df, binned_var, 1)
                 effs_dict[particle] = np.append(effs_dict[particle], eff)
 
     with pd.HDFStore(file, "w") as glob_eff_file:
@@ -203,8 +237,9 @@ def write_eff_file(init_files, norm, coefs, eta, pt_cut, file):
     Input("pt_cut", "value"),
     Input("normby", "value"),
     Input("pileup", "n_clicks"),
+    Input("match", "n_clicks"),
 )
-def global_effs(eta_range, pt_cut, normby, pileup, file="global_eff"):
+def global_effs(eta_range, pt_cut, normby, pileup, match, file="global_NewEff_correct"):
     # even number of clicks --> PU0, odd --> PU200 (will reset with other callbacks otherwise)
     init_files = input_files["PU0"] if pileup%2==0 else input_files["PU200"]
 
@@ -213,6 +248,8 @@ def global_effs(eta_range, pt_cut, normby, pileup, file="global_eff"):
     pt_str = "0" if pt_cut=="PT Cut" else pt_cut
 
     filename = "{}_eta_{}_{}_pt_gtr_{}_{}".format(normby, eta_range[0], eta_range[1], pt_str, file)
+    filename += "_matched" if match%2 !=0 else ""
+
     filename += "_PU0.hdf5" if pileup%2==0 else "_PU200.hdf5"
     
     pile_up_dir = "PU0" if pileup%2==0 else "PU200"
@@ -229,7 +266,7 @@ def global_effs(eta_range, pt_cut, normby, pileup, file="global_eff"):
         with pd.HDFStore(filename_iehle, "r") as glob_eff_file:
             effs_by_coef = glob_eff_file["/Eff"].to_dict(orient="list")
     else:
-        effs_by_coef = write_eff_file(init_files, normby, coefs, eta_range, pt_cut, filename_user)
+        effs_by_coef = write_eff_file(init_files, normby, coefs, eta_range, pt_cut, match, filename_user)
 
     coefs = np.linspace(0.0, 0.05, 50)
 

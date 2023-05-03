@@ -44,7 +44,8 @@ layout = html.Div(
         html.H4("Normalized Cluster Energy"),
         html.Hr(),
         html.Div([dbc.Button("Pile Up", id="pileup", color="primary", n_clicks=0),
-                  dcc.Input(id="pt_cut", value="PT Cut", type='text')]),
+                  dcc.Input(id="pt_cut", value="PT Cut", type='text'),
+                  dbc.Button("dR Matching", id='match', color="primary", n_clicks=0)]),
         html.Hr(),
         dcc.Graph(id="cl-en-graph", mathjax=True),
         html.P("EtaRange:"),
@@ -66,7 +67,7 @@ def fill_dict_w_mean_norm(key, eta, pt_cut, df, norm, out_dict):
     out_dict[key] = np.append(out_dict[key], mean_energy)
 
 
-def write_plot_file(input_files, norm, eta, pt, outfile, pars=vars(FLAGS)):
+def write_plot_file(input_files, norm, eta, pt, match, outfile, pars=vars(FLAGS)):
     normed_energies = {}
     for key in input_files.keys():
         # Initialize at 0 since we only consider coefs[1:] (coefs[0] is an empty dataframe)
@@ -81,6 +82,7 @@ def write_plot_file(input_files, norm, eta, pt, outfile, pars=vars(FLAGS)):
                 coef_strs = File.keys()
                 for coef in coef_strs[1:]:
                     df = File[coef] if File[coef].index.name=="event" else File[coef].set_index("event")
+                    df = df[ df["matches"] == True ] if match%2 !=0 else df
                     fill_dict_w_mean_norm(
                         key, eta, pt, df, norm, normed_energies
                     )
@@ -95,6 +97,7 @@ def write_plot_file(input_files, norm, eta, pt, outfile, pars=vars(FLAGS)):
                     if not full_df.index.name == "event"
                     else full_df
                 )
+                full_df = full_df[ full_df["matches"]==True ] if match%2 !=0 else full_df
                 fill_dict_w_mean_norm(
                     key, eta, pt, full_df, norm, normed_energies
                 )
@@ -115,9 +118,10 @@ def write_plot_file(input_files, norm, eta, pt, outfile, pars=vars(FLAGS)):
     Input("eta_range", "value"),
     Input("pt_cut", "value"),
     Input("pileup", "n_clicks"),
+    Input("match", "n_clicks"),
 )
 def plot_norm(
-    normby, eta_range, pt_cut, pileup, plot_file="normed_distribution"
+    normby, eta_range, pt_cut, pileup, match, plot_file="normed_distribution"
 ):
     # even number of clicks --> PU0, odd --> PU200 (will reset with other callbacks otherwise)
     init_files = input_files["PU0"] if pileup%2==0 else input_files["PU200"]
@@ -135,6 +139,7 @@ def plot_norm(
     plot_filename = "{}_{}_eta_{}_pt_gtr_{}_{}_testing_".format(
         normby, plot_file, eta_range[0], eta_range[1], pt_str
     )
+    plot_filename += "_matched" if match%2 != 0 else ""
     plot_filename += "_PU0.hdf5" if pileup%2==0 else "_PU200.hdf5"
     
     pile_up_dir = "PU0" if pileup%2==0 else "PU200"
@@ -154,7 +159,7 @@ def plot_norm(
         with pd.HDFStore(plot_filename_iehle, "r") as PlotFile:
             normed_dist = PlotFile["/Normed_Dist"].to_dict(orient="list")
     else:
-        normed_dist = write_plot_file(init_files, normby, eta_range, pt_cut, plot_filename_user)
+        normed_dist = write_plot_file(init_files, normby, eta_range, pt_cut, match, plot_filename_user)
 
     start, end, tot = cfg["coeffs"]
     coefs = np.linspace(start, end, tot)
