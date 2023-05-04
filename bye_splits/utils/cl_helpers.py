@@ -104,4 +104,56 @@ def filter_dfs(dfs_by_particle, eta_range, pt_cut):
     return filtered_dfs
     
 
+class ClusterSizeData:
+    def __init__(self):
+        self._dir = None
+        self._particles = None
+        self._radius = None
+        self._pileup = None
 
+    def __str__(self):
+        return self.__repr__()
+    
+    def __repr__(self):
+        s = ('ClusterSizeData instance:\n' +
+             'dir = {}\n'.format(self._dir) +
+             'particles = {}\n'.format(self._particles) +
+             'radius = {}\n'.format(self._radius) +
+             'pileup = {}\n'.format(self._pileup))
+        return s
+    
+    @property
+    def dir(self):
+        return self._dir
+    
+    @dir.setter
+    def dir(self, dir):
+        self._dir = dir
+             
+    @property
+    def particles(self):
+        return self._particles
+    
+    @particles.setter
+    def particles(self, particles):
+        self._particles = particles
+
+    @property
+    def radius(self):
+        return self._radius
+    
+    @radius.setter
+    def radius(self, radius):
+        self._radius = radius
+
+    @property
+    def pileup(self):
+        return self._pileup
+
+    @pileup.setter
+    def pileup(self, pileup):
+        self._pileup = pileup
+
+    @property
+    def radius_str(self):
+        return "coef_{}".format(str(self._radius).replace(".","p"))
