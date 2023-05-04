@@ -134,12 +134,14 @@ def EventDataParticle(tag, reprocess, logger=None, debug=False, particles=None):
             raise ValueError("{} are not supported.".format(particles))
         defevents = cfg["defaultEvents"][particles]
 
-        indata = InputData()
-        indata.path = cfg["io"]["file" + particles]
-        indata.adir = cfg["io"]["dir" + particles]
-        indata.tree = cfg["io"]["tree" + particles]
+        pile_up_sel = "PU0" if not cfg["selection"]["pileup"] else "PU200"
 
-    tag = particles + "_" + tag
+        indata = InputData()
+        indata.path = cfg["io"][pile_up_sel][particles]["file"]
+        indata.adir = cfg["io"][pile_up_sel][particles]["dir"]
+        indata.tree = cfg["io"][pile_up_sel][particles]["tree"]
+
+    tag = "{}_{}_{}".format(particles, pile_up_sel, tag)
     tag += "_debug" * debug
 
     return EventData(indata, tag, defevents, reprocess, logger)

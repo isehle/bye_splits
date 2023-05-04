@@ -1,22 +1,30 @@
 io:
-  #dirphotons: hgcalTriggerNtuplizer
-  #treephotons: HGCalTriggerNtuple
-  #filephotons: /data_CMS/cms/alves/L1HGCAL/skim_small_TEST_module_TEST_BIG_Thresh0.root
-  dirphotons: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
-  treephotons: HGCalTriggerNtuple
-  filephotons: /data_CMS/cms/ehle/L1HGCAL/PU200/photons/skims/skim_tightTC_dRxy_hadd.root
-  #direlectrons: hgcalTriggerNtuplizer
-  #treeelectrons: HGCalTriggerNtuple
-  #fileelectrons: /eos/user/i/iehle/data/PU0/electrons/skim_electrons_0PU_bc_stc_hadd.root
-  #dirpions: hgcalTriggerNtuplizer
-  #treepions: HGCalTriggerNtuple
-  #filepions: /eos/user/i/iehle/data/PU0/pions/skim_pions_0PU_new_hadd.root
-  direlectrons: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
-  treeelectrons: HGCalTriggerNtuple
-  fileelectrons: /data_CMS/cms/ehle/L1HGCAL/PU200/electrons/skims/skim_tightTC_dRxy_hadd.root
-  dirpions: hgcalTriggerNtuplizer
-  treepions: HGCalTriggerNtuple
-  filepions: /data_CMS/cms/ehle/L1HGCAL/PU0/pions/skims/skim_tightTC_dRxy_hadd.root
+  PU0:
+    photons:
+      dir: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
+      tree: HGCalTriggerNtuple
+      file: /data_CMS/cms/ehle/L1HGCAL/PU0/photons/skims/skim_tightTC_dRxy_hadd.root
+    electrons:
+      dir: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
+      tree: HGCalTriggerNtuple
+      file: /data_CMS/cms/ehle/L1HGCAL/PU0/electrons/skims/skim_tightTC_dRxy_hadd.root
+    pions:
+      dir: hgcalTriggerNtuplizer
+      tree: HGCalTriggerNtuple
+      file: /data_CMS/cms/ehle/L1HGCAL/PU0/pions/skims/skim_tightTC_dRxy_hadd.root
+  PU200:
+    photons:
+      dir: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
+      tree: HGCalTriggerNtuple
+      file: /data_CMS/cms/ehle/L1HGCAL/PU200/photons/skims/skim_tightTC_dRxy_hadd.root
+    electrons:
+      dir: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
+      tree: HGCalTriggerNtuple
+      file: /data_CMS/cms/ehle/L1HGCAL/PU200/electrons/skims/skim_tightTC_dRxy_hadd.root
+    pions:
+      dir: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
+      tree: HGCalTriggerNtuple
+      file: /data_CMS/cms/ehle/L1HGCAL/PU200/pions/skims/skim_tightTC_dRxy_hadd.root
 
 geometry:
     dir: L1THGCaltriggergeomtester
@@ -28,7 +36,8 @@ geometry:
     nlayersCEH: 22
   
 selection:
-    particles: electrons
+    particles: pions
+    pileup: True
     disconnectedTriggerLayers: [2,4,6,8,10,12,14,16,18,20,22,24,26,28]
     reachedEE: 2
     deltarThreshold: 0.05
@@ -40,9 +49,9 @@ defaultEvents:
     pions: [9102, 9148]
 
 skim:
-  dir: /data_CMS/cms/ehle/L1HGCAL/PU0/
-  infilePath: /data_CMS/cms/ehle/L1HGCAL/PU0/pions/ntuples/ntuple_3.root
-  rootDir: hgcalTriggerNtuplizer
+  dir: /data_CMS/cms/ehle/L1HGCAL/PU200/
+  infilePath: /data_CMS/cms/ehle/L1HGCAL/PU200/pions/ntuples/ntuple_5.root
+  rootDir: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
   tree: HGCalTriggerNtuple
   outfileBaseName: skim_tightTC_dRxy
   tcDeltaRThresh: 0.1
@@ -64,7 +73,7 @@ job:
     files: /data_CMS/cms/ehle/L1HGCAL/PU200/coefs.txt
     files_per_batch: 1
   pions:
-    submit_dir: /data_CMS/cms/ehle/L1HGCAL/PU0/pions/
+    submit_dir: /data_CMS/cms/ehle/L1HGCAL/PU200/pions/
     files: /data_CMS/cms/ehle/L1HGCAL/PU200/coefs.txt
     files_per_batch: 1
 
