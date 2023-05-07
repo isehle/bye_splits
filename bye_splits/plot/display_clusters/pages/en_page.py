@@ -140,7 +140,7 @@ def plot_norm(
         normby, plot_file, eta_range[0], eta_range[1], pt_str
     )
     plot_filename += "_matched" if match%2 != 0 else ""
-    plot_filename += "_PU0.hdf5" if pileup%2==0 else "_PU200_withElec.hdf5"
+    plot_filename += "_PU0.hdf5" if pileup%2==0 else "_PU200_AllParticles.hdf5"
     
     pile_up_dir = "PU0" if pileup%2==0 else "PU200"
 

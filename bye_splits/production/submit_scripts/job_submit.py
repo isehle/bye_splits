@@ -95,7 +95,8 @@ class CondJobBase(JobBatches):
         current_version.append("export SITECONFIG_PATH=$VO_CMS_SW_DIR/SITECONF/T2_FR_GRIF_LLR/GRIF-LLR/\n")
         current_version.append("source $VO_CMS_SW_DIR/cmsset_default.sh\n")
         if script_ext == ".sh":
-            current_version.append("bash {} $1 $2 $3".format(self.script)) if self.require_args else current_version.append("bash {}".format(self.script))
+            #current_version.append("bash {} $1 $2 $3".format(self.script)) if self.require_args else current_version.append("bash {}".format(self.script))
+            current_version.append("bash {} $1 $2".format(self.script)) if self.require_args else current_version.append("bash {}".format(self.script))
             #current_version.append("bash {} $1".format(self.script)) if self.require_args else current_version.append("bash {}".format(self.script))
         elif script_ext == ".py":
             current_version.append("python {} --batch_file $1 --user {}".format(self.script, self.user))
@@ -119,7 +120,8 @@ class CondJobBase(JobBatches):
         current_version.append("executable = {}\n".format(sub_file))
         current_version.append("Universe              = vanilla\n")
         if self.require_args:
-            current_version.append("Arguments             = $(filename) $(particles) $(pileup)\n")
+            #current_version.append("Arguments             = $(filename) $(particles) $(pileup)\n")
+            current_version.append("Arguments             = $(filename) $(particles)\n")
             #current_version.append("Arguments             = $(filename)\n")
         current_version.append("output = {}{}_C$(Cluster)P$(Process).out\n".format(log_dir, script_basename))
         current_version.append("error = {}{}_C$(Cluster)P$(Process).err\n".format(log_dir, script_basename))
@@ -130,11 +132,13 @@ class CondJobBase(JobBatches):
         current_version.append('+SingularityCmd       = ""\n')
         current_version.append("include: /opt/exp_soft/cms/t3/t3queue |\n")
         if self.require_args:
-            current_version.append("queue filename, particles, pileup from (\n")
+            #current_version.append("queue filename, particles, pileup from (\n")
+            current_version.append("queue filename, particles from (\n")
             pileup = "PU0" if "PU0" in batch_files[0] else "PU200"
             #current_version.append("queue filename from (\n")
             for file in batch_files:
-                current_version.append("{}, {}, {}\n".format(file, self.particle, pileup))
+                #current_version.append("{}, {}, {}\n".format(file, self.particle, pileup))
+                current_version.append("{}, {}\n".format(file, self.particle))
                 #current_version.append("{}\n".format(file))
             current_version.append(")")
 

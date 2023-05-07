@@ -222,7 +222,7 @@ def glob_rms(eta_range, pt_cut, normby, pileup, match, file="rms_and_eff"):
 
     filename += "_matched" if match%2!=0 else ""
 
-    filename += "_PU0.hdf5" if pileup%2==0 else "_PU200_withElec.hdf5"
+    filename += "_PU0.hdf5" if pileup%2==0 else "_PU200_AllParticles.hdf5"
     pile_up_dir = "PU0" if pileup%2==0 else "PU200"
 
     filename_user = "{}{}/{}".format(data_dir, pile_up_dir, filename)

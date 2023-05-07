@@ -10,11 +10,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from bye_splits.utils import common, parsing, params
-
-parser = argparse.ArgumentParser(description="Seeding standalone step.")
-parsing.add_parameters(parser)
-FLAGS = parser.parse_args()
+from bye_splits.utils import common, params
 
 def closest(list, k=0.0):
     """Find the element of a list containing strings ['coef_{float_1}', 'coef_{float_2}', ...] which is closest to some float_i"""
@@ -157,3 +153,4 @@ class ClusterSizeData:
     @property
     def radius_str(self):
         return "coef_{}".format(str(self._radius).replace(".","p"))
+    
