@@ -39,6 +39,11 @@ def selection(df_cl, df_tc, dRThresh, radius):
     
     df_cl = df_cl[ df_cl["matches"] == True ]
     df_cl = df_cl.drop("matches", axis=1)
+
+    max_energies = df_cl.groupby("event").apply(lambda x: x.en.max())
+    mask = df_cl["en"].isin(max_energies)
+    df_cl = df_cl[mask]
+
     cl_en, gen_en = df_cl.en.to_frame(), df_cl.gen_en.to_frame()
 
     df_tc = df_tc[ df_tc.tc_multicluster_id != 0 ]
@@ -64,8 +69,6 @@ def optimize(pars, cfg):
     cfg_sel = cfg["selection"]
     cfg_cl = cfg["clusterStudies"]
 
-    assert(pars.particles==cfg_sel["particles"] and pars.pileup==cfg_sel["pileup"])
-
     file = cfg_cl["dashApp"][pile_up][pars.particles][0]
     reprocess = cfg_cl["reprocess"]
     nevents = cfg_cl["nevents"]
@@ -74,42 +77,34 @@ def optimize(pars, cfg):
 
     _, _, tcData = data_process.get_data_reco_chain_start(nevents=nevents, reprocess=reprocess, particles=particles)
 
+    tc_drop_cols = ['tc_wu', 'tc_wv', 'tc_cu', 'tc_cv']
+    tcData = tcData.drop(tc_drop_cols, axis=1)
+
     with pd.HDFStore(file, mode="r") as clusterSizeOut:
-        radius_str = "/coef_{}".format(str(radius).replace(".","p"))
+        radius_str = "/coef_{}".format(str(round(radius,3)).replace(".","p"))
         df = clusterSizeOut[radius_str]
         vals = selection(df, tcData, dR, radius) if isinstance(df, pd.DataFrame) else None
         
     return vals
 
 def fill_event_layers(df, layers):
-
-    current_event = int(df.event.unique())
+    df.reset_index(inplace=True)
+    current_event, current_en, current_gen_en = int(df.event.unique()), float(df.en.unique()), float(df.gen_en.unique())
 
     needed_layers = [layer for layer in layers if layer not in list(df.tc_layer)]
 
     for layer in needed_layers:
-        new_row = pd.Series({"event": current_event, "tc_layer": layer, "summed_energy": 0.0})
+        new_row = pd.Series({"event": current_event,
+                             "tc_layer": layer,
+                             "summed_energy": 0.0,
+                             "en": current_en,
+                             "gen_en": current_gen_en})
         df = pd.concat([df, new_row.to_frame().T], ignore_index=True)
 
     df.sort_values("tc_layer", inplace=True)
     df = df.groupby("tc_layer").apply(max)
 
     return df
-
-def fill_layers(df, cfg):
-    layers = cfg["selection"]["disconnectedTriggerLayers"]
-    layers = [l-1 for l in layers]
-
-    df = df.reset_index()
-    
-    sub_df = df[["event","en", "gen_en"]].groupby("event").apply(max).drop("event", axis=1)
-    tc_df = df.drop(["en", "gen_en"], axis=1)
-
-    df = tc_df.groupby(["event"]).apply(lambda x: fill_event_layers(x, layers)).droplevel(1).drop("event", axis=1)
-    
-    merged = pd.merge(df, sub_df, left_on="event", right_on="event")
-    
-    return merged
 
 def get_en_norms(df_tc, df_cl_gen):
 
@@ -123,9 +118,15 @@ def get_en_norms(df_tc, df_cl_gen):
     return final
 
 def get_weights(df):
-    df["new_en_sums"] = df.groupby("event",as_index=False).apply(lambda x: x.summed_energy/x.en_norm).reset_index().drop(["level_0"],axis=1).set_index("event")
-    df["normed_en_sums"]=df.groupby("event").apply(lambda x: x.new_en_sums/x.new_en_sums.sum()).to_frame().reset_index(level=1,drop=True)
-    weights = 1+df.groupby("tc_layer").apply(lambda x: x.normed_en_sums.mean()).to_frame().rename({0:"weights"},axis=1)
+    # Weight per / event, irrespective of tc_layer
+    df["event_weights"] = df.gen_en/df.en
+
+    # Find the mean weight among layers which have energy deposits
+    weights = df[ df.summed_energy != 0 ].groupby("tc_layer").apply(lambda x: x.event_weights.mean()).to_frame().rename({0: "weights"},axis=1)
+    
+    # The previous step favors events with more tc_layers, so we rescale the weights
+    rescale = (df.gen_en.mean()/df.en.mean())/df.event_weights.mean()
+    weights = weights*rescale
 
     return weights
 
@@ -138,14 +139,15 @@ def apply_weights(df, weights):
     return df
 
 def main(pars, cfg):
+    # Initial selection and TC matching
     init_vals = optimize(pars, cfg)
-    filled_vals = fill_layers(init_vals, cfg)
 
-    df_cl_gen = filled_vals[["en", "gen_en"]].groupby("event").apply(max)
-    df_tc = filled_vals.drop(["en", "gen_en"], axis=1)
-    df = get_en_norms(df_tc, df_cl_gen)
+    # Fill df with tc_layers with 0 energy deposited
+    df = init_vals.groupby(["event"]).apply(lambda x: fill_event_layers(x, layers))
+    df = df.droplevel(1).drop("event", axis=1)
 
-    weights = get_weights(df)
+    # Find and apply layer weights
+    weights = get_weights(df)    
     final_df = apply_weights(df, weights)
 
     return weights, final_df
@@ -160,12 +162,12 @@ if __name__ == "__main__":
     FLAGS = parser.parse_args()
     pars = common.dot_dict(vars(FLAGS))
 
-    out_dir = "{}/PU0/{}/optimization/".format(cfg["clusterStudies"]["localDir"], pars.particles)
+    out_dir = "{}/PU0/{}/optimization/v2/".format(cfg["clusterStudies"]["localDir"], pars.particles)
 
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
-    radius_str = str(pars.radius).replace(".", "p")
+    radius_str = str(round(pars.radius, 4)).replace(".", "p")
     file_name = "{}/{}_r{}.hdf5".format(out_dir, cfg["clusterStudies"]["optimization"]["baseName"], radius_str)
 
     if not os.path.exists(file_name):

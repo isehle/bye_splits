@@ -33,16 +33,18 @@ app.layout = html.Div(
     [
         html.H4("Cluster Energy Weights by Layer"),
         html.P("Radius:"),
-        html.Div([dcc.Dropdown(radii_rounded,0.01,id="radius")]),
+        html.Div([dcc.Dropdown(radii_rounded,0.01,id="radius"),
+                  dcc.Dropdown(["Version 1", "Version 2"], "Version 1", id="version")]),
         html.Hr(),
         dcc.Graph(id="cl-en-weights", mathjax=True),
     ]
 )
 
-def get_weights(dir, cfg):
+def get_weights(dir, cfg, version):
     weights_by_particle = {}
     for particle in ("photons", "electrons", "pions"):
         particle_dir = dir+particle+"/optimization/"
+        particle_dir += "" if version=="Version 1" else "v2/"
 
         plot_dir = particle_dir+"/plots/"
         if not os.path.exists(plot_dir):
@@ -69,14 +71,17 @@ opt_dir = "{}/PU0/".format(cfg["clusterStudies"]["localDir"])
 
 @app.callback(
     Output("cl-en-weights", "figure"),
-    Input("radius", "value")
+    Input("radius", "value"),
+    Input("version", "value")
 )
-def plot_weights(radius):
-    weights_by_particle = get_weights(opt_dir, cfg)
+def plot_weights(radius, version):
+    weights_by_particle = get_weights(opt_dir, cfg, version)
+
+    particles = ("photons", "electrons", "pions") if version == "Version 1" else ("photons","electrons")
 
     fig = go.Figure()
 
-    for particle in ("photons","electrons","pions"):
+    for particle in particles:
         weights = weights_by_particle[particle][radius]
 
         fig.add_trace(
