@@ -43,7 +43,7 @@ def get_str(coef, df_dict):
     return coef_str
 
 
-def get_dfs(init_files, coef):
+def get_dfs(init_files, coef, weighted=False):
     """Takes a dictionary of input files (keys corresponding to particles, values corresponding to file paths containing DataFrames by coefficient), with a desired coefficient.
     Returns a new dictionary with the same keys, whose values correspond to the DataFrame of that particular coefficient.
     """
@@ -54,17 +54,24 @@ def get_dfs(init_files, coef):
             continue
         elif len(init_files[key]) == 1:
             file = pd.HDFStore(init_files[key][0], "r")
-
             if not isinstance(coef, str):
                 coef = get_str(coef, file)
-
-            df = file[coef]
+            try:
+                df = file[coef]["original"] if not weighted else file[coef]["weighted"]
+            except KeyError:
+                df = file[coef]
             file.close()
         else:
             file_list = [pd.HDFStore(val, "r") for val in init_files[key]]
             if not isinstance(coef, str):
                 coef = get_str(coef, file_list[0])
-            df_list = [file_list[i][coef] for i in range(len(file_list))]
+            try:
+                df_list = []
+                for i in range(len(file_list)):
+                    df = file_list[i][coef]["original"] if not weighted else file_list[i][coef]["weighted"]
+                    df_list.append(df)
+            except KeyError:
+                df_list = [file_list[i][coef] for i in range(len(file_list))]
             df = pd.concat(df_list)
             for file in file_list: file.close()
         df_dict[key] = df
@@ -98,9 +105,38 @@ def filter_dfs(dfs_by_particle, eta_range, pt_cut):
                     filtered_dfs[particle]["deltaRsq"] = (filtered_dfs[particle].loc[:,"gen_phi"]-filtered_dfs[particle].loc[:,"phi"])**2 + (filtered_dfs[particle].loc[:,"gen_eta"]-filtered_dfs[particle].loc[:,"eta"])**2
                     filtered_dfs[particle]["matches"] = filtered_dfs[particle].loc[:,"deltaRsq"] <= 0.05**2
     return filtered_dfs
+
+def read_weights(dir, cfg, version, mode="weights"):
+    weights_by_particle = {}
+    for particle in ("photons", "electrons", "pions"):
+        particle_dir = dir+particle+"/optimization/"
+        particle_dir += "v1/" if version=="Version 1" else "official/"
+
+        plot_dir = particle_dir+"/plots/"
+        if not os.path.exists(plot_dir):
+            os.makedirs(plot_dir)
+
+        basename = cfg["clusterStudies"]["optimization"]["baseName"]
+        files = [f for f in os.listdir(particle_dir) if basename in f]
+        weights_by_radius = {}
+        for file in files:
+            radius = float(file.replace(".hdf5","").replace("optimization_","").replace("r","").replace("p","."))
+            infile = particle_dir+file
+            with pd.HDFStore(infile, "r") as optWeights:
+                weights_by_radius[radius] = optWeights[mode]
+    
+        weights_by_particle[particle] = weights_by_radius
+    
+    return weights_by_particle
+
+def update_button(n_clicks):
+    if n_clicks%2==0:
+        return "primary"
+    else:
+        return "success"
     
 
-class ClusterSizeData:
+'''class ClusterSizeData:
     def __init__(self):
         self._dir = None
         self._particles = None
@@ -152,5 +188,5 @@ class ClusterSizeData:
 
     @property
     def radius_str(self):
-        return "coef_{}".format(str(self._radius).replace(".","p"))
+        return "coef_{}".format(str(self._radius).replace(".","p"))'''
     

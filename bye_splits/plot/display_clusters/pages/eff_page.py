@@ -110,9 +110,9 @@ layout = dbc.Container(
             ]
         ),
         html.Hr(),
-        html.Div([dbc.Button("Pile Up", id="pileup", color="primary", n_clicks=0),
+        html.Div([dbc.Button("Pile Up", id="pileup_eff", color="primary", n_clicks=0),
                   dcc.Input(id="pt_cut", value="PT Cut", type='text'),
-                  dbc.Button("dR Matching", id='match', color="primary", n_clicks=0)]),
+                  dbc.Button("Weighted", id="weight_eff", color="primary", n_clicks=0)]),
         html.Hr(),
         dcc.Graph(id="eff-graph", mathjax=True),
         html.P("Coef:"),
@@ -143,6 +143,19 @@ layout = dbc.Container(
     ]
 )
 
+@callback(
+        Output("pileup_eff", "color"),
+        Input("pileup_eff", "n_clicks")
+)
+def update_pu_button(n_clicks):
+    return cl_helpers.update_button(n_clicks)
+    
+@callback(
+        Output("weight_eff", "color"),
+        Input("weight_eff", "n_clicks")
+)
+def update_weight_button(n_clicks):
+    return cl_helpers.update_button(n_clicks)
 
 # Callback function for display_color() which displays binned efficiency/energy graphs
 @callback(
@@ -152,17 +165,18 @@ layout = dbc.Container(
     Input("eta_range", "value"),
     Input("pt_cut", "value"),
     Input("normby", "value"),
-    Input("pileup", "n_clicks"),
-    Input("match", "n_clicks"),
+    Input("pileup_eff", "n_clicks"),
+    Input("weight_eff", "n_clicks"),
 )
 
 ##############################################################################################################################
 
-def display_color(coef, eta_range, pt_cut, normby, pileup, match):
+def display_color(coef, eta_range, pt_cut, normby, pileup_eff, weight_eff):
     # even number of clicks --> PU0, odd --> PU200 (will reset with other callbacks otherwise)
-    init_files = input_files["PU0"] if pileup%2==0 else input_files["PU200"]
+    init_files = input_files["PU0"] if pileup_eff%2==0 else input_files["PU200"]
+    weight_bool = False if weight_eff%2==0 else True
 
-    df_by_particle = cl_helpers.get_dfs(init_files, coef)
+    df_by_particle = cl_helpers.get_dfs(init_files, coef, weight_bool)
     pt_cut = float(pt_cut) if pt_cut!="PT Cut" else 0
     df_by_particle = cl_helpers.filter_dfs(df_by_particle, eta_range, pt_cut)  # {particle: (df, rms, eff_rms)}
 
@@ -176,7 +190,7 @@ def display_color(coef, eta_range, pt_cut, normby, pileup, match):
     glob_eff_dict = {}
     for particle in particles:
         df = df_by_particle[particle]
-        df = df[ df["matches"] == True ] if match%2 != 0 else df
+        df = df[ df["matches"] == True ]
         #effs, x = binned_effs(df, col_name)
         effs, x = new_binned_effs(df, col_name)
         glob_eff_dict[particle] = np.mean(effs[1:])
@@ -203,15 +217,13 @@ def display_color(coef, eta_range, pt_cut, normby, pileup, match):
 
     return fig, dbc.Table.from_dataframe(glob_effs)
 
-#fig, tab = display_color(0.05, [1.6,2.7], 10, "PT", 1, 1)
-
-def write_eff_file(init_files, norm, coefs, eta, pt_cut, match, file):
+def write_eff_file(init_files, norm, coefs, eta, pt_cut, weight, file):
     pt_cut = float(pt_cut) if pt_cut!="PT Cut" else 0
     binned_var = "gen_en" if norm == "Energy" else "gen_pt"
     
     effs_dict = {}
     for coef in coefs:
-        dfs_by_particle = cl_helpers.get_dfs(init_files, coef)
+        dfs_by_particle = cl_helpers.get_dfs(init_files, coef, weight)
         dfs_by_particle = cl_helpers.filter_dfs(dfs_by_particle, eta, pt_cut)
         for particle in dfs_by_particle.keys():
             # Note that a cluster having radius (coef) zero also has zero efficiency, so we initialize as such
@@ -219,7 +231,7 @@ def write_eff_file(init_files, norm, coefs, eta, pt_cut, match, file):
                 effs_dict[particle] = [0.0]
             else:
                 df = dfs_by_particle[particle]
-                df = df[ df["matches"]==True ] if match%2 !=0 else df
+                df = df[ df["matches"]==True ]
                 #eff, _ = binned_effs(df, binned_var, 1.0)
                 eff = new_binned_effs(df, binned_var, 1)
                 effs_dict[particle] = np.append(effs_dict[particle], eff)
@@ -236,23 +248,24 @@ def write_eff_file(init_files, norm, coefs, eta, pt_cut, match, file):
     Input("eta_range", "value"),
     Input("pt_cut", "value"),
     Input("normby", "value"),
-    Input("pileup", "n_clicks"),
-    Input("match", "n_clicks"),
+    Input("pileup_eff", "n_clicks"),
+    Input("weight_eff", "n_clicks"),
 )
-def global_effs(eta_range, pt_cut, normby, pileup, match, file="global_eff"):
+def global_effs(eta_range, pt_cut, normby, pileup_eff, weight_eff, file="global_eff"):
     # even number of clicks --> PU0, odd --> PU200 (will reset with other callbacks otherwise)
-    init_files = input_files["PU0"] if pileup%2==0 else input_files["PU200"]
+    init_files = input_files["PU0"] if pileup_eff%2==0 else input_files["PU200"]
+    weight_bool = True if weight_eff%2==0 else False
 
     coefs = cl_helpers.get_keys(init_files)
 
     pt_str = "0" if pt_cut=="PT Cut" else pt_cut
 
     filename = "{}_eta_{}_{}_pt_gtr_{}_{}".format(normby, eta_range[0], eta_range[1], pt_str, file)
-    filename += "_matched" if match%2 !=0 else ""
+    filename += "_matched"
 
-    filename += "_PU0.hdf5" if pileup%2==0 else "_PU200_AllParticles.hdf5"
+    filename += "_PU0.hdf5" if pileup_eff%2==0 else "_PU200_AllParticles.hdf5"
     
-    pile_up_dir = "PU0" if pileup%2==0 else "PU200"
+    pile_up_dir = "PU0" if pileup_eff%2==0 else "PU200"
 
     filename_user = "{}{}/{}".format(data_dir, pile_up_dir, filename)
     filename_iehle = "{}{}{}/{}".format(
@@ -266,7 +279,7 @@ def global_effs(eta_range, pt_cut, normby, pileup, match, file="global_eff"):
         with pd.HDFStore(filename_iehle, "r") as glob_eff_file:
             effs_by_coef = glob_eff_file["/Eff"].to_dict(orient="list")
     else:
-        effs_by_coef = write_eff_file(init_files, normby, coefs, eta_range, pt_cut, match, filename_user)
+        effs_by_coef = write_eff_file(init_files, normby, coefs, eta_range, pt_cut, weight_bool, filename_user)
 
     coefs = np.linspace(0.0, 0.05, 50)
 

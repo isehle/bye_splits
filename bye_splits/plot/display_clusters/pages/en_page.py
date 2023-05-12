@@ -43,9 +43,9 @@ layout = html.Div(
     [
         html.H4("Normalized Cluster Energy"),
         html.Hr(),
-        html.Div([dbc.Button("Pile Up", id="pileup", color="primary", n_clicks=0),
+        html.Div([dbc.Button("Pile Up", id="pileup_en", color="primary", n_clicks=0),
                   dcc.Input(id="pt_cut", value="PT Cut", type='text'),
-                  dbc.Button("dR Matching", id='match', color="primary", n_clicks=0)]),
+                  dbc.Button("Weighted", id="weight_en", color="primary", n_clicks=0)]),
         html.Hr(),
         dcc.Graph(id="cl-en-graph", mathjax=True),
         html.P("EtaRange:"),
@@ -67,43 +67,24 @@ def fill_dict_w_mean_norm(key, eta, pt_cut, df, norm, out_dict):
     out_dict[key] = np.append(out_dict[key], mean_energy)
 
 
-def write_plot_file(input_files, norm, eta, pt, match, outfile, pars=vars(FLAGS)):
+def write_plot_file(input_files, norm, eta, pt, weight, coefs, outfile, pars=vars(FLAGS)):
     normed_energies = {}
     for key in input_files.keys():
         # Initialize at 0 since we only consider coefs[1:] (coefs[0] is an empty dataframe)
         if len(input_files[key]) > 0:
             normed_energies[key] = [0.0]
 
-    for key in input_files.keys():
-        if len(input_files[key]) == 0:
-            continue
-        elif len(input_files[key]) == 1:
-            with pd.HDFStore(input_files[key][0], "r") as File:
-                coef_strs = File.keys()
-                for coef in coef_strs[1:]:
-                    df = File[coef] if File[coef].index.name=="event" else File[coef].set_index("event")
-                    df = df[ df["matches"] == True ] if match%2 !=0 else df
-                    fill_dict_w_mean_norm(
-                        key, eta, pt, df, norm, normed_energies
-                    )
-        else:
-            file_list = [pd.HDFStore(val, "r") for val in input_files[key]]
-            coef_strs = file_list[0].keys()
-            for coef in coef_strs[1:]:
-                df_list = [file_list[i][coef] for i in range(len(file_list))]
-                full_df = pd.concat(df_list)
-                full_df = (
-                    full_df.set_index("event")
-                    if not full_df.index.name == "event"
-                    else full_df
-                )
-                full_df = full_df[ full_df["matches"]==True ] if match%2 !=0 else full_df
-                fill_dict_w_mean_norm(
-                    key, eta, pt, full_df, norm, normed_energies
-                )
-
-            for file in file_list:
-                file.close()
+    normed_energies = {}
+    for coef in coefs:
+        dfs_by_particle = cl_helpers.get_dfs(input_files, coef, weight)
+        dfs_by_particle = cl_helpers.filter_dfs(dfs_by_particle, eta, pt)
+        for particle in dfs_by_particle.keys():
+            if particle not in normed_energies.keys():
+                normed_energies[particle] = [0.0]
+            else:
+                df = dfs_by_particle[particle]
+                df = df[ df["matches"] == True ]
+                fill_dict_w_mean_norm(particle, eta, pt, df, norm, normed_energies)
 
     with pd.HDFStore(outfile, "w") as PlotFile:
         normed_df = pd.DataFrame.from_dict(normed_energies)
@@ -111,20 +92,36 @@ def write_plot_file(input_files, norm, eta, pt, match, outfile, pars=vars(FLAGS)
 
     return normed_energies
 
+@callback(
+        Output("pileup_en", "color"),
+        Input("pileup_en", "n_clicks")
+)
+def update_pu_button(n_clicks):
+    return cl_helpers.update_button(n_clicks)
+    
+@callback(
+        Output("weight_en", "color"),
+        Input("weight_en", "n_clicks")
+)
+def update_weight_button(n_clicks):
+    return cl_helpers.update_button(n_clicks)
 
 @callback(
     Output("cl-en-graph", "figure"),
     Input("normby", "value"),
     Input("eta_range", "value"),
     Input("pt_cut", "value"),
-    Input("pileup", "n_clicks"),
-    Input("match", "n_clicks"),
+    Input("pileup_en", "n_clicks"),
+    Input("weight_en", "n_clicks"),
 )
 def plot_norm(
-    normby, eta_range, pt_cut, pileup, match, plot_file="normed_distribution"
+    normby, eta_range, pt_cut, pileup_en, weight_en, plot_file="normed_distribution"
 ):
     # even number of clicks --> PU0, odd --> PU200 (will reset with other callbacks otherwise)
-    init_files = input_files["PU0"] if pileup%2==0 else input_files["PU200"]
+    init_files = input_files["PU0"] if pileup_en%2==0 else input_files["PU200"]
+    weight_bool = False if weight_en%2==0 else True
+
+    coef_keys = cl_helpers.get_keys(init_files)
     global y_axis_title
 
     if normby == "Energy":
@@ -134,15 +131,16 @@ def plot_norm(
     else:
         y_axis_title = r"$\huge{\frac{E_{Cl}}{E_{Max}}}$"
 
-    pt_str = "0" if pt_cut=="PT Cut" else pt_cut
+    pt_str = "0" if pt_cut=="PT Cut" else str(pt_cut)
+    pt_cut = float(pt_str)
 
-    plot_filename = "{}_{}_eta_{}_pt_gtr_{}_{}".format(
+    plot_filename = "{}_{}_eta_{}_pt_gtr_{}_{}_match".format(
         normby, plot_file, eta_range[0], eta_range[1], pt_str
     )
-    plot_filename += "_matched" if match%2 != 0 else ""
-    plot_filename += "_PU0.hdf5" if pileup%2==0 else "_PU200_AllParticles.hdf5"
+    plot_filename += "" if weight_en%2==0 else "weighted_"
+    plot_filename += "_PU0.hdf5" if pileup_en%2==0 else "_PU200_AllParticles.hdf5"
     
-    pile_up_dir = "PU0" if pileup%2==0 else "PU200"
+    pile_up_dir = "PU0" if pileup_en%2==0 else "PU200"
 
     plot_filename_user = "{}{}/{}".format(data_dir, pile_up_dir, plot_filename)
     plot_filename_iehle = "{}{}{}/new_{}".format(
@@ -159,7 +157,7 @@ def plot_norm(
         with pd.HDFStore(plot_filename_iehle, "r") as PlotFile:
             normed_dist = PlotFile["/Normed_Dist"].to_dict(orient="list")
     else:
-        normed_dist = write_plot_file(init_files, normby, eta_range, pt_cut, match, plot_filename_user)
+        normed_dist = write_plot_file(init_files, normby, eta_range, pt_cut, weight_bool, coef_keys, plot_filename_user)
 
     start, end, tot = cfg["coeffs"]
     coefs = np.linspace(start, end, tot)

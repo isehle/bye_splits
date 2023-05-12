@@ -61,11 +61,11 @@ job:
   proxy: ~/.t3/proxy.cert
   queue: short
   local: False
-  script: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/bye_splits/production/submit_scripts/calibrate_cluster_energy.sh
+  script: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/bye_splits/production/submit_scripts/condor_cluster_size.sh
   require_args: True
   read_dir: False # {True: read arguments as paths in <submit_dir>/ntuples, False: read arguments stored on the .txt <files>}
   photons:
-    submit_dir: /data_CMS/cms/ehle/L1HGCAL/PU0/photons/
+    submit_dir: /data_CMS/cms/ehle/L1HGCAL/PU200/photons/
     files: /data_CMS/cms/ehle/L1HGCAL/PU200/coefs.txt
     files_per_batch: 1
   electrons:
@@ -84,6 +84,7 @@ varEvents:
     gphi: 'good_genpart_exphi'
     gen: 'good_genpart_energy'
     gpid: 'good_genpart_pid'
+    layer: 'good_tc_layer'
   tc:
     event: 'event'
     wu: 'good_tc_waferu'
@@ -114,6 +115,7 @@ varEvents:
     id: 'good_cl3d_id'
     matches: 'matches'
     dR: 'deltaR'
+    layer: 'good_tc_layer'
     
 varGeometry:
     wu: 'waferu'
@@ -141,22 +143,26 @@ clusterStudies:
   pileup: True
   reprocess: False # {True: Process the ROOT file, False: read the .parquet if already processed}
   reinit: True # Run (fill, smooth, seed) tasks
-  clusterSizeBaseName: cluster_size
+  clusterSizeBaseName: cluster_size_weighted
   coeffs: [0.0, 0.05, 50]
   nevents: -1
   tree: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple/HGCalTriggerNtuple
   local: False
   dashApp:
     PU0:
-      photons: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/photons/cluster/photons_PU0_cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
-      electrons: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
-      pions: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
+      photons: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/photons/cluster/weighted/cluster_size_weighted_ThresholdDummyHistomaxnoareath20.hdf5]
+      electrons: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/weighted/cluster_size_weighted_ThresholdDummyHistomaxnoareath20.hdf5]
+      pions: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/weighted/cluster_size_weighted_ThresholdDummyHistomaxnoareath20.hdf5]
     PU200:
-      photons: [/grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/photons/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
-      electrons: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/electrons/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
-      pions: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
+      photons: [/grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/photons/cluster/weighted/cluster_size_weighted_ThresholdDummyHistomaxnoareath20.hdf5]
+      electrons: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/electrons/cluster/weighted/cluster_size_weighted_ThresholdDummyHistomaxnoareath20.hdf5]
+      pions: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/cluster_size_weighted_ThresholdDummyHistomaxnoareath20.hdf5]
   optimization:
     baseName: optimization
+    pt_cut: 5
+    cl_pt_cut: 3
+    eta_min: 1.6
+    eta_max: 2.9
 
 base:
   NbinsRz: 42

@@ -106,6 +106,7 @@ def get_data_reco_chain_start(nevents=500, reprocess=False, tag='chain', particl
         "good_genpart_exeta": "gen_eta",
         "good_genpart_exphi": "gen_phi",
         "good_genpart_energy": "gen_en",
+        "good_tc_layer": "gen_layer",
     }
     ds_gen = ds_all["gen"]
     ds_gen = ds_gen.rename(columns=gen_keep)
@@ -116,6 +117,7 @@ def get_data_reco_chain_start(nevents=500, reprocess=False, tag='chain', particl
         "good_cl3d_phi": "cl3d_phi",
         "good_cl3d_id": "cl3d_id",
         "good_cl3d_energy": "cl3d_en",
+        "good_tc_layer": "cl3d_layer"
     }
     ds_cl = ds_all["cl"]
     ds_cl = ds_cl.rename(columns=cl_keep)

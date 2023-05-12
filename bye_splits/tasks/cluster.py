@@ -18,6 +18,75 @@ import numpy as np
 import pandas as pd
 import h5py
 
+def write_columns(df, kw):
+    if "weights" in kw.keys():
+        weights = kw["weights"]
+        df = df.merge(weights, left_on="tc_layer",right_index=True)
+        df["weighted_tc_mipPt"] = df.tc_mipPt * df.weights
+        df["weighted_tc_pt"] = df.tc_pt * df.weights
+
+
+    df["cl3d_pos_x"] = df.tc_x * df.tc_mipPt
+    df["cl3d_pos_y"] = df.tc_y * df.tc_mipPt
+    df["cl3d_pos_z"] = df.tc_z * df.tc_mipPt
+
+    if "weights" in kw.keys():
+        df["weighted_cl3d_pos_x"] = df.tc_x * df.weighted_tc_mipPt
+        df["weighted_cl3d_pos_y"] = df.tc_y * df.weighted_tc_mipPt
+        df["weighted_cl3d_pos_z"] = df.tc_z * df.weighted_tc_mipPt
+
+    cl3d_cols = ["cl3d_pos_x", "cl3d_pos_y", "cl3d_pos_z", "tc_mipPt", "tc_pt"]
+    if "weights" in kw.keys():
+        cl3d_cols = cl3d_cols + ["weighted_{}".format(col) for col in cl3d_cols]
+
+    cl3d = df.groupby(["seed_idx"]).sum()[cl3d_cols]
+    cl3d = cl3d.rename(
+        columns={
+            "cl3d_pos_x": "x",
+            "cl3d_pos_y": "y",
+            "cl3d_pos_z": "z",
+            "tc_mipPt": "mipPt",
+            "tc_pt": "pt",
+        }
+    )
+
+    if "weights" in kw.keys():
+        cl3d = cl3d.rename(
+            columns={
+                "weighted_cl3d_pos_x": "weighted_x",
+                "weighted_cl3d_pos_y": "weighted_y",
+                "weighted_cl3d_pos_z": "weighted_z",
+                "weighted_tc_mipPt": "weighted_mipPt",
+                "weighted_tc_pt": "weighted_pt",
+            }
+        )
+
+    cl3d = cl3d[cl3d.pt > kw["PtC3dThreshold"]] if "weights" not in kw.keys() else cl3d[cl3d.weighted_pt > kw["PtC3dThreshold"]]
+
+    if "weights" not in kw.keys():
+        cl3d.loc[:, ["x", "y", "z"]] = cl3d.loc[:, ["x", "y", "z"]].div(
+            cl3d.mipPt, axis=0
+        )
+    else:
+         cl3d.loc[:, ["weighted_x", "weighted_y", "weighted_z"]] = cl3d.loc[:, ["weighted_x", "weighted_y", "weighted_z"]].div(
+            cl3d.weighted_mipPt, axis=0
+        )       
+
+    cl3d_dist = np.sqrt(cl3d.x**2 + cl3d.y**2)
+    cl3d["phi"] = np.arctan2(cl3d.y, cl3d.x)
+    cl3d["eta"] = np.arcsinh(cl3d.z / cl3d_dist)
+    cl3d["Rz"] = common.calcRzFromEta(cl3d.eta)
+    cl3d["en"] = cl3d.pt * np.cosh(cl3d.eta)
+
+    if "weights" in kw.keys():
+        weighted_cl3d_dist = np.sqrt(cl3d.weighted_x**2 + cl3d.weighted_y**2)
+        cl3d["weighted_phi"] = np.arctan2(cl3d.weighted_y, cl3d.weighted_x)
+        cl3d["weighted_eta"] = np.arcsinh(cl3d.weighted_z / weighted_cl3d_dist)
+        cl3d["weighted_Rz"] = common.calcRzFromEta(cl3d.weighted_eta)
+        cl3d["weighted_en"] = cl3d.weighted_pt * np.cosh(cl3d.weighted_eta)
+
+    return cl3d
+
 def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
     dfout = None
     sseeds = h5py.File(in_seeds, mode='r')
@@ -57,6 +126,9 @@ def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
         # checks if each event has at least one seed laying below the threshold
         thresh = dRs < np.expand_dims(minDist, axis=-1)
 
+        if not (True in thresh):
+            continue
+
         try:
             # assign TCs to the closest seed (within a maximum distance)
             if pars["cluster_algo"] == "min_distance":
@@ -94,7 +166,14 @@ def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
         assert len(cols) == res.shape[1]
 
         df = pd.DataFrame(res, columns=cols)
+        if df.empty:
+            breakpoint()
         assert not df.empty
+
+        '''if "weights" in kw.keys():
+            df = df.merge(weights, left_on="tc_layer",right_index=True)
+            df["weighted_tc_mipPt"] = df.tc_mipPt * df.weights
+            df["weighted_pt"] = df.tc_pt * df.weights
 
         df["cl3d_pos_x"] = df.tc_x * df.tc_mipPt
         df["cl3d_pos_y"] = df.tc_y * df.tc_mipPt
@@ -121,7 +200,11 @@ def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
         cl3d["phi"] = np.arctan2(cl3d.y, cl3d.x)
         cl3d["eta"] = np.arcsinh(cl3d.z / cl3d_dist)
         cl3d["Rz"] = common.calcRzFromEta(cl3d.eta)
-        cl3d["en"] = cl3d.pt * np.cosh(cl3d.eta)
+        cl3d["en"] = cl3d.pt * np.cosh(cl3d.eta)'''
+
+        cl3d = write_columns(df, kw)
+
+        #breakpoint()
 
         search_str = "{}_([0-9]{{1,7}})_tc".format(kw["FesAlgo"])
         event_number = re.search(search_str, tck)
@@ -131,6 +214,8 @@ def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
 
         cl3d["event"] = event_number.group(1)
         cl3d_cols = ["en", "x", "y", "z", "Rz", "eta", "phi"]
+        if "weights" in kw.keys():
+            cl3d_cols = cl3d_cols + ["weighted_{}".format(col) for col in cl3d_cols]
         sout[key] = cl3d[cl3d_cols]
         if tck == tc_keys[0] and seedk == seed_keys[0]:
             dfout = cl3d[cl3d_cols + ["event"]]
