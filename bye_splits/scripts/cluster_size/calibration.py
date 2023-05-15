@@ -36,7 +36,7 @@ def selection(pars, cfg):
     cfg_sel = cfg["selection"]
     cfg_cl = cfg["clusterStudies"]
 
-    file = cfg_cl["dashApp"][pile_up][pars.particles][0]
+    file = cfg_cl["optimization"]["files"][pars.particles][0]
     reprocess = cfg_cl["reprocess"]
     nevents = cfg_cl["nevents"]
     
@@ -48,14 +48,13 @@ def selection(pars, cfg):
 
     with pd.HDFStore(file, mode="r") as clFile:
         df = clFile[radius_str]
-        df.drop(["pt_norm","en_norm"],axis=1, inplace=True)
-    
-    if "deltaR" not in df.keys():
-        dR_thresh = cfg_sel["deltarThreshold"]
-        df["dR"] = np.sqrt((df["eta"]-df["gen_eta"])**2 + (df["phi"]-df["gen_phi"])**2)
-        df = df[ df.dR < dR_thresh ]
-        df.drop("dR", axis=1, inplace=True)
-
+        # Cut events that fall out of one sig from the mean
+        norm_min = df.pt_norm.mean() - df.pt_norm.std()
+        norm_max = df.pt_norm.mean() + df.pt_norm.std()
+        df = df[ df.pt_norm > norm_min ]
+        df = df[ df.pt_norm < norm_max ]
+        df = df[ df.matches == True ]
+        df.drop(["pt_norm","en_norm", "dR", "matches"],axis=1, inplace=True)
 
     df = df[ df.gen_pt > ptcut ]
     df = df[ df.gen_eta > etamin ]

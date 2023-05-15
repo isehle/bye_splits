@@ -260,8 +260,8 @@ def global_effs(eta_range, pt_cut, normby, pileup_eff, weight_eff, file="global_
 
     pt_str = "0" if pt_cut=="PT Cut" else pt_cut
 
-    filename = "{}_eta_{}_{}_pt_gtr_{}_{}".format(normby, eta_range[0], eta_range[1], pt_str, file)
-    filename += "_matched"
+    filename = "{}_eta_{}_{}_pt_gtr_{}_{}_matched".format(normby, eta_range[0], eta_range[1], pt_str, file)
+    filename += "reWeighted_" if weight_bool else ""
 
     filename += "_PU0.hdf5" if pileup_eff%2==0 else "_PU200_AllParticles.hdf5"
     

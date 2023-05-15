@@ -43,45 +43,26 @@ def get_str(coef, df_dict):
     return coef_str
 
 
-def get_dfs(init_files, coef, weighted=False):
+def get_dfs(init_files, coef, weighted=False, weight_version=None):
     """Takes a dictionary of input files (keys corresponding to particles, values corresponding to file paths containing DataFrames by coefficient), with a desired coefficient.
     Returns a new dictionary with the same keys, whose values correspond to the DataFrame of that particular coefficient.
     """
     df_dict = dict.fromkeys(init_files.keys(), [0.0])
-
     for key in init_files.keys():
-        if len(init_files[key]) == 0:
-            continue
-        elif len(init_files[key]) == 1:
-            file = pd.HDFStore(init_files[key][0], "r")
-            if not isinstance(coef, str):
-                coef = get_str(coef, file)
-            try:
-                df = file[coef]["original"] if not weighted else file[coef]["weighted"]
-            except KeyError:
-                df = file[coef]
-            file.close()
-        else:
-            file_list = [pd.HDFStore(val, "r") for val in init_files[key]]
-            if not isinstance(coef, str):
-                coef = get_str(coef, file_list[0])
-            try:
-                df_list = []
-                for i in range(len(file_list)):
-                    df = file_list[i][coef]["original"] if not weighted else file_list[i][coef]["weighted"]
-                    df_list.append(df)
-            except KeyError:
-                df_list = [file_list[i][coef] for i in range(len(file_list))]
-            df = pd.concat(df_list)
-            for file in file_list: file.close()
+        file = pd.HDFStore(init_files[key], "r") if key!="electrons" else pd.HDFStore(init_files[key][weight_version], "r")
+        if not isinstance(coef, str):
+            coef = get_str(coef, file)
+        if not coef in file.keys():
+            coef = file.keys()[0]
+        df = file[coef]["original"] if not weighted else file[coef]["weighted"]
+        file.close()
         df_dict[key] = df
-
     return common.dot_dict(df_dict)
 
 
 def get_keys(init_files):
     """Returns the list of exact coefficient keys in the initial files; they're the same for all files, so we only need to check one."""
-    file_path = init_files["photons"][0]
+    file_path = init_files["photons"]
 
     with pd.HDFStore(file_path, "r") as file:
         keys = file.keys()
@@ -106,21 +87,33 @@ def filter_dfs(dfs_by_particle, eta_range, pt_cut):
                     filtered_dfs[particle]["matches"] = filtered_dfs[particle].loc[:,"deltaRsq"] <= 0.05**2
     return filtered_dfs
 
-def read_weights(dir, cfg, version, mode="weights"):
+def read_weights(dir, cfg, version="originalWeights", mode="weights"):
     weights_by_particle = {}
     for particle in ("photons", "electrons", "pions"):
-        particle_dir = dir+particle+"/optimization/"
-        particle_dir += "v1/" if version=="Version 1" else "official/"
+        particle_dir = "{}{}/optimization/official/".format(dir, particle)
 
         plot_dir = particle_dir+"/plots/"
         if not os.path.exists(plot_dir):
             os.makedirs(plot_dir)
 
-        basename = cfg["clusterStudies"]["optimization"]["baseName"]
-        files = [f for f in os.listdir(particle_dir) if basename in f]
+        if particle=="electrons":
+            if version=="originalWeights":
+                version = "optimization_"
+                files = [f for f in os.listdir(particle_dir) if "optimization_r" in f]
+            elif version=="ptNormGtr0p8":
+                version = "noTail"
+                files = [f for f in os.listdir(particle_dir) if "noTail" in f]
+            else:
+                version = "ptNormWithinOneSigReal"
+                files = [f for f in os.listdir(particle_dir) if "ptNormWithinOneSigReal" in f]
+        else:
+            files = [f for f in os.listdir(particle_dir) if "optimization" in f]
         weights_by_radius = {}
         for file in files:
-            radius = float(file.replace(".hdf5","").replace("optimization_","").replace("r","").replace("p","."))
+            if (particle == "electrons" and version != "optimization_"):
+                radius = float(file.replace(".hdf5","").replace("optimization_{}_".format(version), "").replace("r","").replace("0p","0."))
+            else:
+                radius = float(file.replace(".hdf5","").replace("optimization_","").replace("r","").replace("p","."))
             infile = particle_dir+file
             with pd.HDFStore(infile, "r") as optWeights:
                 weights_by_radius[radius] = optWeights[mode]

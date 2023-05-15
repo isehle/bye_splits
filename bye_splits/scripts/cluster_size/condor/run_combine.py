@@ -60,6 +60,7 @@ def combine_files_by_coef(in_dir, file_pattern):
     ]
     coef_pattern = r"coef_0p(\d+)"
     out_path = common.fill_path(file_pattern, data_dir=in_dir)
+    breakpoint()
     with pd.HDFStore(out_path, "w") as clusterSizeOut:
         print("\nCombining Files:\n")
         for file in tqdm(files):
@@ -73,7 +74,7 @@ def combine_cluster(cfg):
     particles = cfg["particles"]
     pileup = "PU0" if not cfg["clusterStudies"]["pileup"] else "PU200"
 
-    dir = "{}/{}/{}/cluster/weighted/".format(params.LocalStorage, pileup, particles)
+    dir = "{}/{}/{}/cluster/weighted/oneSigReal/".format(params.LocalStorage, pileup, particles)
     cl_size_out = common.fill_path(cfg["clusterStudies"]["clusterSizeBaseName"], data_dir=dir)
 
     combine_files_by_coef(dir, cfg["clusterStudies"]["clusterSizeBaseName"])
@@ -96,6 +97,9 @@ if __name__ == "__main__":
     with open(params.CfgPath, "r") as afile:
         cfg = yaml.safe_load(afile)
 
-    for particles in ("photons", "electrons", "pions"):
+    cfg.update({"particles": "electrons"})
+    combine_cluster(cfg)
+
+    '''for particles in ("photons", "electrons", "pions"):
         cfg.update({"particles": particles})
-        combine_cluster(cfg)
+        combine_cluster(cfg)'''

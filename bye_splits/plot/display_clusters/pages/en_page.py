@@ -46,7 +46,8 @@ layout = html.Div(
         html.Div([dbc.Button("Pile Up", id="pileup_en", color="primary", n_clicks=0),
                   dcc.Input(id="pt_cut", value="PT Cut", type='text'),
                   dbc.Button("Weighted", id="weight_en", color="primary", n_clicks=0)]),
-        html.Hr(),
+        html.P("Weight Version (Electrons)"),
+        dcc.Dropdown(["originalWeights", "ptNormGtr0p8", "withinOneSig"], "originalWeights", id="weight_version"),
         dcc.Graph(id="cl-en-graph", mathjax=True),
         html.P("EtaRange:"),
         dcc.RangeSlider(id="eta_range", min=1.4, max=2.7, step=0.1, value=[1.6, 2.7]),
@@ -67,7 +68,7 @@ def fill_dict_w_mean_norm(key, eta, pt_cut, df, norm, out_dict):
     out_dict[key] = np.append(out_dict[key], mean_energy)
 
 
-def write_plot_file(input_files, norm, eta, pt, weight, coefs, outfile, pars=vars(FLAGS)):
+def write_plot_file(input_files, norm, eta, pt, weight, coefs, outfile, weight_version=None):
     normed_energies = {}
     for key in input_files.keys():
         # Initialize at 0 since we only consider coefs[1:] (coefs[0] is an empty dataframe)
@@ -76,7 +77,7 @@ def write_plot_file(input_files, norm, eta, pt, weight, coefs, outfile, pars=var
 
     normed_energies = {}
     for coef in coefs:
-        dfs_by_particle = cl_helpers.get_dfs(input_files, coef, weight)
+        dfs_by_particle = cl_helpers.get_dfs(input_files, coef, weight, weight_version)
         dfs_by_particle = cl_helpers.filter_dfs(dfs_by_particle, eta, pt)
         for particle in dfs_by_particle.keys():
             if particle not in normed_energies.keys():
@@ -91,6 +92,9 @@ def write_plot_file(input_files, norm, eta, pt, weight, coefs, outfile, pars=var
         PlotFile.put("Normed_Dist", normed_df)
 
     return normed_energies
+
+'''coef_keys = cl_helpers.get_keys(input_files["PU0"])
+test = write_plot_file(input_files["PU0"], "PT", [1.6,2.7], 10, True, coef_keys, "something")'''
 
 @callback(
         Output("pileup_en", "color"),
@@ -113,9 +117,10 @@ def update_weight_button(n_clicks):
     Input("pt_cut", "value"),
     Input("pileup_en", "n_clicks"),
     Input("weight_en", "n_clicks"),
+    Input("weight_version", "value")
 )
 def plot_norm(
-    normby, eta_range, pt_cut, pileup_en, weight_en, plot_file="normed_distribution"
+    normby, eta_range, pt_cut, pileup_en, weight_en, weight_version, plot_file="normed_distribution"
 ):
     # even number of clicks --> PU0, odd --> PU200 (will reset with other callbacks otherwise)
     init_files = input_files["PU0"] if pileup_en%2==0 else input_files["PU200"]
@@ -134,10 +139,10 @@ def plot_norm(
     pt_str = "0" if pt_cut=="PT Cut" else str(pt_cut)
     pt_cut = float(pt_str)
 
-    plot_filename = "{}_{}_eta_{}_pt_gtr_{}_{}_match".format(
+    plot_filename = "{}_{}_eta_{}_pt_gtr_{}_{}_matched".format(
         normby, plot_file, eta_range[0], eta_range[1], pt_str
     )
-    plot_filename += "" if weight_en%2==0 else "weighted_"
+    plot_filename += "" if weight_en%2==0 else "_{}".format(weight_version)
     plot_filename += "_PU0.hdf5" if pileup_en%2==0 else "_PU200_AllParticles.hdf5"
     
     pile_up_dir = "PU0" if pileup_en%2==0 else "PU200"
@@ -157,7 +162,7 @@ def plot_norm(
         with pd.HDFStore(plot_filename_iehle, "r") as PlotFile:
             normed_dist = PlotFile["/Normed_Dist"].to_dict(orient="list")
     else:
-        normed_dist = write_plot_file(init_files, normby, eta_range, pt_cut, weight_bool, coef_keys, plot_filename_user)
+        normed_dist = write_plot_file(init_files, normby, eta_range, pt_cut, weight_bool, coef_keys, plot_filename_user, weight_version)
 
     start, end, tot = cfg["coeffs"]
     coefs = np.linspace(start, end, tot)

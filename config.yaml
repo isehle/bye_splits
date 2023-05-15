@@ -69,7 +69,7 @@ job:
     files: /data_CMS/cms/ehle/L1HGCAL/PU200/coefs.txt
     files_per_batch: 1
   electrons:
-    submit_dir: /data_CMS/cms/ehle/L1HGCAL/PU200/electrons/
+    submit_dir: /data_CMS/cms/ehle/L1HGCAL/PU0/electrons/
     files: /data_CMS/cms/ehle/L1HGCAL/PU200/coefs.txt
     files_per_batch: 1
   pions:
@@ -140,25 +140,32 @@ clusterStudies:
   localDir: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/
   ehleDir: /eos/user/i/iehle/
   dataFolder: data/
-  pileup: True
+  pileup: False
   reprocess: False # {True: Process the ROOT file, False: read the .parquet if already processed}
   reinit: True # Run (fill, smooth, seed) tasks
-  clusterSizeBaseName: cluster_size_weighted
+  clusterSizeBaseName: cluster_size_weighted_ptNormWithinOneSigReal
   coeffs: [0.0, 0.05, 50]
   nevents: -1
   tree: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple/HGCalTriggerNtuple
   local: False
   dashApp:
     PU0:
-      photons: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/photons/cluster/weighted/cluster_size_weighted_ThresholdDummyHistomaxnoareath20.hdf5]
-      electrons: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/weighted/cluster_size_weighted_ThresholdDummyHistomaxnoareath20.hdf5]
-      pions: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/weighted/cluster_size_weighted_ThresholdDummyHistomaxnoareath20.hdf5]
+      photons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/photons/cluster/weighted/cluster_size_weighted_ThresholdDummyHistomaxnoareath20.hdf5
+      electrons:
+        originalWeights: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/weighted/cluster_size_weighted_ThresholdDummyHistomaxnoareath20.hdf5
+        ptNormGtr0p8: data/new_algos/PU0/electrons/cluster/weighted/noTail/cluster_size_weighted_ThresholdDummyHistomaxnoareath20.hdf5
+        withinOneSig: data/new_algos/PU0/electrons/cluster/weighted/oneSigReal/cluster_size_weighted_ptNormWithinOneSigReal_ThresholdDummyHistomaxnoareath20.hdf5
+      pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/weighted/cluster_size_weighted_ThresholdDummyHistomaxnoareath20.hdf5
     PU200:
-      photons: [/grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/photons/cluster/weighted/cluster_size_weighted_ThresholdDummyHistomaxnoareath20.hdf5]
-      electrons: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/electrons/cluster/weighted/cluster_size_weighted_ThresholdDummyHistomaxnoareath20.hdf5]
-      pions: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/cluster_size_weighted_ThresholdDummyHistomaxnoareath20.hdf5]
+      photons: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/photons/cluster/weighted/cluster_size_weighted_ThresholdDummyHistomaxnoareath20.hdf5
+      electrons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/electrons/cluster/weighted/cluster_size_weighted_ThresholdDummyHistomaxnoareath20.hdf5
+      pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/cluster_size_weighted_ThresholdDummyHistomaxnoareath20.hdf5
   optimization:
-    baseName: optimization
+    files:
+      photons: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/photons/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
+      electrons: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
+      pions: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
+    baseName: optimization_ptNormWithinOneSigReal
     pt_cut: 5
     cl_pt_cut: 3
     eta_min: 1.6

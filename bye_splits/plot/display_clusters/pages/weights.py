@@ -6,7 +6,7 @@ import sys
 parent_dir = os.path.abspath(__file__ + 4 * "/..")
 sys.path.insert(0, parent_dir)
 
-from bye_splits.utils import params, common
+from bye_splits.utils import params, cl_helpers
 
 import pandas as pd
 import numpy as np
@@ -40,7 +40,7 @@ layout = html.Div(
         ),
         html.P("Radius:"),
         html.Div([dcc.Dropdown(radii_rounded,0.01,id="radius"),
-                  dcc.Dropdown(["Version 1", "Official"], "Official", id="version"),
+                  dcc.Dropdown(["originalWeights", "ptNormGtr0p8", "withinOneSig"], "originalWeights", id="version"),
                   dcc.Dropdown(["Weights", "Distributions"], "Weights", id="mode")]),
         html.Hr(),
         dcc.Graph(id="cl-en-weights", mathjax=True),
@@ -74,7 +74,7 @@ def get_weights(dir, cfg, version, mode):
 with open(params.CfgPath, mode="r") as afile:
     cfg = yaml.safe_load(afile)
 
-opt_dir = "{}/PU0/".format(cfg["clusterStudies"]["localDir"])
+opt_dir = "{}/PU0/".format(params.LocalStorage)
 
 @callback(
     Output("cl-en-weights", "figure"),
@@ -84,7 +84,9 @@ opt_dir = "{}/PU0/".format(cfg["clusterStudies"]["localDir"])
 )
 def plot_weights(radius, version, mode):
     plot = "weights" if mode=="Weights" else "df"
-    weights_by_particle = get_weights(opt_dir, cfg, version, plot)
+    #weights_by_particle = get_weights(opt_dir, cfg, version, plot)
+    
+    weights_by_particle = cl_helpers.read_weights(opt_dir, cfg, version=version, mode=plot)
 
     particles = weights_by_particle.keys()
 
@@ -105,8 +107,8 @@ def plot_weights(radius, version, mode):
                 col=1
             )
         else:
-            old_norm = weights.en/weights.gen_en
-            new_norm = weights.new_en/weights.gen_en
+            old_norm = weights.pt/weights.gen_pt
+            new_norm = weights.new_pt/weights.gen_pt
 
             fig.add_trace(
                 go.Histogram(
@@ -151,6 +153,8 @@ def plot_weights(radius, version, mode):
     fig.update_yaxes(automargin=True)
     fig.update_xaxes(automargin=True)
     return fig
+
+#fig = plot_weights(0.01, "official", "weights")
 
 def save_fig(dir, pars, cfg):
     weights_by_particle = get_weights(dir, cfg)
