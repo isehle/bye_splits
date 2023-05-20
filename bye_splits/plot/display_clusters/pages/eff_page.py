@@ -81,7 +81,7 @@ def new_binned_effs(df, norm, nbins=100):
         effs = cl_counts.combine(gen_counts, eff, fill_value=0).tolist()
     else:
         """Since by construction there is only one gen particle/event, 
-        repeated gens give us the efficiency/event directly. We then define
+        repeated events give us the efficiency/event directly. We then define
         an efficiency/radius as mean(efficiencies/events) for a given radius."""
         
         effs_per_event = df.reset_index().groupby(norm)["event"].count().tolist()
@@ -261,7 +261,7 @@ def global_effs(eta_range, pt_cut, normby, pileup_eff, weight_eff, file="global_
     pt_str = "0" if pt_cut=="PT Cut" else pt_cut
 
     filename = "{}_eta_{}_{}_pt_gtr_{}_{}_matched".format(normby, eta_range[0], eta_range[1], pt_str, file)
-    filename += "reWeighted_" if weight_bool else ""
+    filename += "_weightedFinal" if weight_bool else ""
 
     filename += "_PU0.hdf5" if pileup_eff%2==0 else "_PU200_AllParticles.hdf5"
     

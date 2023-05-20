@@ -40,36 +40,12 @@ layout = html.Div(
         ),
         html.P("Radius:"),
         html.Div([dcc.Dropdown(radii_rounded,0.01,id="radius"),
-                  dcc.Dropdown(["originalWeights", "ptNormGtr0p8", "withinOneSig"], "originalWeights", id="version"),
+                  #dcc.Dropdown(["originalWeights", "ptNormGtr0p8", "withinOneSig"], "originalWeights", id="version"),
                   dcc.Dropdown(["Weights", "Distributions"], "Weights", id="mode")]),
         html.Hr(),
         dcc.Graph(id="cl-en-weights", mathjax=True),
     ]
 )
-
-def get_weights(dir, cfg, version, mode):
-    weights_by_particle = {}
-    for particle in ("photons", "electrons", "pions"):
-        particle_dir = dir+particle+"/optimization/"
-        particle_dir += "v1/" if version=="Version 1" else "official/"
-
-        plot_dir = particle_dir+"/plots/"
-        if not os.path.exists(plot_dir):
-            os.makedirs(plot_dir)
-
-        basename = cfg["clusterStudies"]["optimization"]["baseName"]
-        files = [f for f in os.listdir(particle_dir) if basename in f]
-
-        weights_by_radius = {}
-        for file in files:
-            radius = float(file.replace(".hdf5","").replace("optimization_","").replace("r","").replace("p","."))
-            infile = particle_dir+file
-            with pd.HDFStore(infile, "r") as optWeights:
-                weights_by_radius[radius] = optWeights[mode]
-    
-        weights_by_particle[particle] = weights_by_radius
-    
-    return weights_by_particle
 
 with open(params.CfgPath, mode="r") as afile:
     cfg = yaml.safe_load(afile)
@@ -79,14 +55,13 @@ opt_dir = "{}/PU0/".format(params.LocalStorage)
 @callback(
     Output("cl-en-weights", "figure"),
     Input("radius", "value"),
-    Input("version", "value"),
+    #Input("version", "value"),
     Input("mode", "value")
 )
-def plot_weights(radius, version, mode):
+def plot_weights(radius, mode):
     plot = "weights" if mode=="Weights" else "df"
-    #weights_by_particle = get_weights(opt_dir, cfg, version, plot)
     
-    weights_by_particle = cl_helpers.read_weights(opt_dir, cfg, version=version, mode=plot)
+    weights_by_particle = cl_helpers.read_weights(opt_dir, cfg, mode=plot)
 
     particles = weights_by_particle.keys()
 
@@ -155,18 +130,4 @@ def plot_weights(radius, version, mode):
     return fig
 
 #fig = plot_weights(0.01, "official", "weights")
-
-def save_fig(dir, pars, cfg):
-    weights_by_particle = get_weights(dir, cfg)
-
-    fig = plot_weights(weights_by_particle, pars.radius)
-
-    out_plot_dir = "{}/plots/".format(dir)
-    if not os.path.exists(out_plot_dir):
-        os.makedirs(out_plot_dir)
-    
-    radius_str = str(pars.radius).replace(".","p")
-    out_file = "{}/{}_r{}.html".format(out_plot_dir, cfg["clusterStudies"]["optimization"]["baseName"], radius_str)
-
-    fig.write_html(out_file)
 

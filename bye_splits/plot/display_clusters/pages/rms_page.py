@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
 import pandas as pd
-import random
+from statistics import mode
 
 parent_dir = os.path.abspath(__file__ + 5 * "/..")
 sys.path.insert(0, parent_dir)
@@ -43,15 +43,14 @@ def effrms(data, c=0.68):
 
     return out
 
-def get_rms(init_files, coef, eta_range, pt_cut, normby, weight, weight_version, rms_dict=None, rms_eff_dict=None):
-    dfs_by_particle = cl_helpers.get_dfs(init_files, coef, weight, weight_version)
+def get_rms(init_files, coef, eta_range, pt_cut, normby, weight, rms_dict=None, rms_eff_dict=None):
+    dfs_by_particle = cl_helpers.get_dfs(init_files, coef, weight)
     pt_cut = float(pt_cut) if pt_cut!="PT Cut" else 0
 
     dfs_by_particle = cl_helpers.filter_dfs(dfs_by_particle, eta_range, pt_cut)
 
     new_dict = {}
     for particle, df in dfs_by_particle.items():
-        #df = df[ df["matches"] == True] if match%2!=0 else df
         df = df[ df["matches"] == True]
         norm = df["en_norm"] if normby == "Energy" else df["pt_norm"]
         rms = norm.std() / norm.mean()
@@ -88,16 +87,16 @@ layout = dbc.Container(
         html.Hr(),
         html.Div([dbc.Button("Pile Up", id="pileup", color="primary", n_clicks=0),
                   dcc.Input(id="pt_cut", value="PT Cut", type='text'),
-                  dbc.Button("Weighted", id="weight", color="primary", n_clicks=0)]),
+                  dbc.Button("Weighted", id="weight", color="primary", n_clicks=0),
+                  dbc.Button("Full Distribution", id="dist", color="primary", n_clicks=0)]),
         html.Hr(),
         dcc.Graph(id="histograms-x-graph", mathjax=True),
         html.P("Coef:"),
-        dcc.Slider(id="coef", min=0.0, max=0.05, value=0.001, marks=marks),
+        dcc.Slider(id="coef", min=0.0, max=0.05, value=0.01, marks=marks),
         html.P("EtaRange:"),
         dcc.RangeSlider(id="eta_range", min=1.4, max=2.7, step=0.1, value=[1.6, 2.7]),
         html.P("Normalization:"),
         dcc.Dropdown(["Energy", "PT"], "PT", id="normby"),
-        dcc.Dropdown(["originalWeights", "ptNormGtr0p8", "withinOneSig"], "originalWeights", id="weight_version"),
         html.Hr(),
         dbc.Row(
             [
@@ -133,6 +132,17 @@ def update_weight_button(n_clicks):
     return cl_helpers.update_button(n_clicks)
 
 @callback(
+        Output("dist", "color"),
+        Input("dist", "n_clicks")
+)
+def update_dist_button(n_clicks):
+    return cl_helpers.update_button(n_clicks)
+
+def get_y_max(dist, nbins=100):
+    hist, _ = np.histogram(dist, bins=nbins)
+    return np.max(hist)
+
+@callback(
     Output("histograms-x-graph", "figure"),
     Output("my_table", "children"),
     Input("coef", "value"),
@@ -141,18 +151,19 @@ def update_weight_button(n_clicks):
     Input("normby", "value"),
     Input("pileup", "n_clicks"),
     Input("weight", "n_clicks"),
-    Input("weight_version", "value")
+    Input("dist", "n_clicks")
 )
 
 ##############################################################################################################################
 
 
-def plot_dists(coef, eta_range, pt_cut, normby, pileup, weight, weight_version):
+def plot_dists(coef, eta_range, pt_cut, normby, pileup, weight, dist):
     init_files = input_files["PU0"] if pileup%2==0 else input_files["PU200"]
     weight_bool = False if weight%2==0 else True
-    data_by_particle = get_rms(init_files, coef, eta_range, pt_cut, normby, weight_bool, weight_version) # {particle: (df, rms, eff_rms)}
+    dist_bool = False if dist%2==0 else True
+    data_by_particle = get_rms(init_files, coef, eta_range, pt_cut, normby, weight_bool) # {particle: (df, rms, eff_rms)}
     
-    fig = go.Figure()
+    fig = make_subplots(rows=1, cols=2, subplot_titles=("EM", "Hadronic"))
 
     col_name = "pt_norm" if normby!="Energy" else "en_norm"
     vals = {}
@@ -172,18 +183,42 @@ def plot_dists(coef, eta_range, pt_cut, normby, pileup, weight, weight_version):
         concat_info = lambda info: "".join([info[i] for i in range(len(info))])
         hovertext = list(map(concat_info, hovertext))
 
-        vals_with_overflow = [np.minimum(1.2, val) for val in df[col_name]]
-        #tick_marks = [str(val) if val != 1.2 else " > 1.2 " for val in vals_with_overflow] # Not currently showing up
+        if not dist_bool:
+            underflow = [val for val in df[col_name] if val < 0.8]
+            display_vals = [val for val in df[col_name] if (0.8 < val < 1.2)]
+            overflow = [val for val in df[col_name] if val > 1.2]
+
+            under_perc = 10*round(len(underflow)/len(df[col_name]),2)
+            display_perc = 10*round(len(display_vals)/len(df[col_name]),2)
+            over_perc = 10*round(len(overflow)/len(df[col_name]),2)
+        else:
+            display_vals = df[col_name]
+
+        print(f"{particle}: {rms}")
 
         fig.add_trace(go.Histogram(
-                            x = vals_with_overflow,
+                            x = display_vals,
                             nbinsx=100,
                             autobinx=False,
                             name=particle.capitalize(),
                             hovertext = hovertext,
-                        )  
-        ) 
-        #fig.update_xaxes(ticktext=tick_marks)
+                        ),
+                        row=1,
+                        col=2 if particle=="pions" else 1  
+        )
+
+        if not dist_bool:
+            annotation = f"{particle.capitalize()}:<br>Underflow Count: {len(underflow)} ({under_perc}%)<br>Displayed Count: {len(display_vals)} ({display_perc}%)<br>Overflow Count: {len(overflow)} ({over_perc}%)"
+            x_annot_pos, y_annot_pos = 1.1, 1.2*get_y_max(display_vals, 100)
+            
+            fig.add_annotation(
+                x = x_annot_pos,
+                y = y_annot_pos,
+                xref = "x1" if particle != "pions" else "x2",
+                yref = "y1" if particle != "pions" else "y2",
+                text = annotation,
+                showarrow=False
+            )
 
         gauss_diff = np.abs(eff_rms - rms) / rms
         gauss_str = format(gauss_diff, ".3f")
@@ -213,7 +248,7 @@ def plot_dists(coef, eta_range, pt_cut, normby, pileup, weight, weight_version):
 
 #fig, tab = plot_dists(0.05, [1.6,2.7], 10, "PT", 1, 1)
 
-def write_rms_file(init_files, coefs, eta, pt, norm, weight, weight_version, filename):
+def write_rms_file(init_files, coefs, eta, pt, norm, weight, filename):
     rms_by_part, rms_eff_by_part = {}, {}
     for particle in init_files.keys():
         if len(init_files[particle])>0:
@@ -221,7 +256,7 @@ def write_rms_file(init_files, coefs, eta, pt, norm, weight, weight_version, fil
             rms_eff_by_part[particle] = []
 
     for coef in coefs[1:]:
-        get_rms(init_files, coef, eta, pt, norm, weight, weight_version, rms_by_part, rms_eff_by_part)
+        get_rms(init_files, coef, eta, pt, norm, weight, rms_by_part, rms_eff_by_part)
 
     with pd.HDFStore(filename, "w") as glob_rms_file:
         glob_rms_file.put("RMS", pd.DataFrame.from_dict(rms_by_part))
@@ -237,9 +272,9 @@ def write_rms_file(init_files, coefs, eta, pt, norm, weight, weight_version, fil
     Input("normby", "value"),
     Input("pileup", "n_clicks"),
     Input("weight", "n_clicks"),
-    Input("weight_version", "value")
+    #Input("weight_version", "value")
 )
-def glob_rms(eta_range, pt_cut, normby, pileup, weight, weight_version, file="rms_and_eff"):
+def glob_rms(eta_range, pt_cut, normby, pileup, weight, file="rms_and_eff"):
     # even number of clicks --> PU0, odd --> PU200 (will reset with other callbacks otherwise)
     init_files = input_files["PU0"] if pileup%2==0 else input_files["PU200"]
     weight_bool = False if weight%2==0 else True
@@ -251,7 +286,7 @@ def glob_rms(eta_range, pt_cut, normby, pileup, weight, weight_version, file="rm
         normby, str(eta_range[0]), str(eta_range[1]), pt_cut, file
     )
 
-    filename += "_{}".format(weight_version) if weight_bool else ""
+    filename += "_weightedFinal" if weight_bool else ""
     filename += "_PU0.hdf5" if pileup%2==0 else "_PU200_AllParticles.hdf5"
     pile_up_dir = "PU0" if pileup%2==0 else "PU200"
 
@@ -271,7 +306,7 @@ def glob_rms(eta_range, pt_cut, normby, pileup, weight, weight_version, file="rm
             ), glob_rms_file["/Eff_RMS"].to_dict(orient="list")
     else:
         rms_by_part, rms_eff_by_part = write_rms_file(
-            init_files, coefs, eta_range, pt_cut, normby, weight_bool, weight_version, filename_user
+            init_files, coefs, eta_range, pt_cut, normby, weight_bool, filename_user
         )
 
     nice_coefs = np.linspace(0.0, 0.05, 50)
