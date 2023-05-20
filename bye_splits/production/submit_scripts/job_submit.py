@@ -46,7 +46,7 @@ class CondJobBase(JobBatches):
         super().__init__(particle, config)
         self.particle_dir = particle_var(self.particle, "submit_dir")
         self.script = config["job"]["script"]
-        self.require_args = config["job"]["require_args"]
+        self.args = config["job"]["arguments"]
         self.queue = config["job"]["queue"]
         self.proxy = config["job"]["proxy"]
         self.local = config["job"]["local"]
@@ -73,12 +73,7 @@ class CondJobBase(JobBatches):
 
 
     def prepare_batch_submission(self):
-        _, script_ext = os.path.splitext(self.script)
-
         sub_dir = "{}subs/".format(self.particle_dir)
-        eos_home = "/eos/user/{}/{}/".format(self.user[0], self.user)
-
-        pileup = "PU0" if "PU0" in self.particle_dir else "PU200"
 
         if not os.path.exists(sub_dir):
             os.makedirs(sub_dir)
@@ -94,13 +89,15 @@ class CondJobBase(JobBatches):
         current_version.append("export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch\n")
         current_version.append("export SITECONFIG_PATH=$VO_CMS_SW_DIR/SITECONF/T2_FR_GRIF_LLR/GRIF-LLR/\n")
         current_version.append("source $VO_CMS_SW_DIR/cmsset_default.sh\n")
-        if script_ext == ".sh":
-            current_version.append("bash {} $1 $2 $3".format(self.script)) if self.require_args else current_version.append("bash {}".format(self.script))
-            #current_version.append("bash {} $1 $2".format(self.script)) if self.require_args else current_version.append("bash {}".format(self.script))
-            #current_version.append("bash {} $1".format(self.script)) if self.require_args else current_version.append("bash {}".format(self.script))
-        elif script_ext == ".py":
-            current_version.append("python {} --batch_file $1 --user {}".format(self.script, self.user))
-
+        if len(self.args) > 0:
+            args = ["bash {}".format(self.script)]
+            for i in range(len(self.args)):
+                args.append(f"${i+1}")
+            args = " ".join(args)
+            current_version.append(args)
+        else:
+            current_version.append("bash {}".format(self.script))
+            
         # Write the file only if an identical file doesn't already exist
         global sub_file
         sub_file = common.conditional_write(submit_file_versions, submit_file_name_template, current_version)
@@ -109,6 +106,18 @@ class CondJobBase(JobBatches):
         log_dir = "{}logs/".format(self.particle_dir)
         
         batch_files = current_batch_versions
+
+        arg_dict = {}
+        for arg in self.args:
+            if arg=="filename":
+                arg_dict[arg] = batch_files
+            elif arg=="particles":
+                arg_dict[arg] = self.particle
+            elif arg=="pileup":
+                arg_dict[arg] = "PU0" if "PU0" in batch_files[0] else "PU200"
+            else:
+                print(f"{arg} is not currently supported.")
+                quit()
 
         script_basename = os.path.basename(self.script).replace(".sh", "").replace(".py", "")
 
@@ -119,10 +128,11 @@ class CondJobBase(JobBatches):
         current_version = []
         current_version.append("executable = {}\n".format(sub_file))
         current_version.append("Universe              = vanilla\n")
-        if self.require_args:
-            current_version.append("Arguments             = $(filename) $(particles) $(pileup)\n")
-            #current_version.append("Arguments             = $(filename) $(particles)\n")
-            #current_version.append("Arguments             = $(filename)\n")
+        if len(self.args) > 0:
+            current_version.append("Arguments =")
+            for arg in self.args[:-1]:
+                current_version.append(" $({}) ".format(arg))
+            current_version.append("$({})\n".format(self.args[-1]))
         current_version.append("output = {}{}_C$(Cluster)P$(Process).out\n".format(log_dir, script_basename))
         current_version.append("error = {}{}_C$(Cluster)P$(Process).err\n".format(log_dir, script_basename))
         current_version.append("log = {}{}_C$(Cluster)P$(Process).log\n".format(log_dir, script_basename))
@@ -131,15 +141,16 @@ class CondJobBase(JobBatches):
         current_version.append("WNTag                 = el7\n")
         current_version.append('+SingularityCmd       = ""\n')
         current_version.append("include: /opt/exp_soft/cms/t3/t3queue |\n")
-        if self.require_args:
-            current_version.append("queue filename, particles, pileup from (\n")
-            #current_version.append("queue filename, particles from (\n")
-            pileup = "PU0" if "PU0" in batch_files[0] else "PU200"
-            #current_version.append("queue filename from (\n")
-            for file in batch_files:
-                current_version.append("{}, {}, {}\n".format(file, self.particle, pileup))
-                #current_version.append("{}, {}\n".format(file, self.particle))
-                #current_version.append("{}\n".format(file))
+        if len(arg_dict.keys()) > 0:
+            arg_keys = [key for key in arg_dict.keys()]
+            arg_keys = ", ".join(arg_keys)
+            arg_keys = "queue " + arg_keys + " from (\n"
+            current_version.append(arg_keys)
+            for file in arg_dict["filename"]:
+                sub_args = list(arg_dict.keys())[1:]
+                arg_vals = [file]+[arg_dict[key] for key in sub_args]
+                arg_vals = ", ".join(arg_vals) + "\n"
+                current_version.append(arg_vals)
             current_version.append(")")
 
         # Write the file only if an identical file doesn't already exist
@@ -205,11 +216,12 @@ if __name__ == "__main__":
     with open(params.CfgPath, "r") as afile:
         config = yaml.safe_load(afile)
 
-    job = CondJob("electrons", config)
+    job = CondJob("pions", config)
     job.prepare_jobs()
     job.launch_jobs()
 
-    '''for particle in ("photons", "electrons", "pions"):
+    #for particle in ("photons", "electrons", "pions"):
+    '''for particle in ("electrons", "pions"):
         job = CondJob(particle, config)
         job.prepare_jobs()
         job.launch_jobs()'''

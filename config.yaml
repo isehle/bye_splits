@@ -61,8 +61,8 @@ job:
   proxy: ~/.t3/proxy.cert
   queue: short
   local: False
-  script: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/bye_splits/production/submit_scripts/condor_cluster_size.sh
-  require_args: True
+  script: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/bye_splits/production/submit_scripts/calibrate_cluster_energy.sh
+  arguments: [filename, particles]
   read_dir: False # {True: read arguments as paths in <submit_dir>/ntuples, False: read arguments stored on the .txt <files>}
   photons:
     submit_dir: /data_CMS/cms/ehle/L1HGCAL/PU0/photons/
@@ -143,7 +143,7 @@ clusterStudies:
   pileup: False
   reprocess: False # {True: Process the ROOT file, False: read the .parquet if already processed}
   reinit: True # Run (fill, smooth, seed) tasks
-  clusterSizeBaseName: cluster_size_photAndBound5
+  clusterSizeBaseName: cluster_size_jobTest
   coeffs: [0.0, 0.05, 50]
   nevents: -1
   tree: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple/HGCalTriggerNtuple
@@ -162,7 +162,7 @@ clusterStudies:
       photons: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/photons/cluster/photons_PU0_cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
       electrons: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
       pions: [data/new_algos/PU0/pions/cluster/fullEvents/cluster_size_eventTest_ThresholdDummyHistomaxnoareath20.hdf5]
-    baseName: optimization_photAndBound5
+    baseName: optimization_jobTest
     pt_cut: 5
     cl_pt_cut: 3
     eta_min: 1.6
