@@ -18,6 +18,12 @@ import numpy as np
 import pandas as pd
 import h5py
 
+with open(params.CfgPath, 'r') as afile:
+        cfg = yaml.safe_load(afile)
+
+layers = cfg["selection"]["disconnectedTriggerLayers"]
+layers = [l-1 for l in layers]
+
 def write_columns(df, kw):
     if "weights" in kw.keys():
         weights = kw["weights"]
@@ -38,8 +44,9 @@ def write_columns(df, kw):
     cl3d_cols = ["cl3d_pos_x", "cl3d_pos_y", "cl3d_pos_z", "tc_mipPt", "tc_pt"]
     if "weights" in kw.keys():
         cl3d_cols = cl3d_cols + ["weighted_{}".format(col) for col in cl3d_cols]
-
-    cl3d = df.groupby(["seed_idx"]).sum()[cl3d_cols]
+        #cl3d = df.groupby(["seed_idx"], group_keys=True).sum()[cl3d_cols]
+        # While the above should be equivalent, for some reason it drops the weighted columns, resulting in a KeyError
+    cl3d = df.groupby(["seed_idx"], group_keys=True).apply(lambda x: x.sum())[cl3d_cols]
     cl3d = cl3d.rename(
         columns={
             "cl3d_pos_x": "x",
@@ -51,14 +58,18 @@ def write_columns(df, kw):
     )
 
     if "weights" in kw.keys():
+        columns={
+            "weighted_cl3d_pos_x": "weighted_x",
+            "weighted_cl3d_pos_y": "weighted_y",
+            "weighted_cl3d_pos_z": "weighted_z",
+            "weighted_tc_mipPt": "weighted_mipPt",
+            "weighted_tc_pt": "weighted_pt",
+        }
+        for layer in layers:
+            col_name = "tc_pt_layer_" + str(layer) + "_frac"
+            columns.update({col_name: col_name}) 
         cl3d = cl3d.rename(
-            columns={
-                "weighted_cl3d_pos_x": "weighted_x",
-                "weighted_cl3d_pos_y": "weighted_y",
-                "weighted_cl3d_pos_z": "weighted_z",
-                "weighted_tc_mipPt": "weighted_mipPt",
-                "weighted_tc_pt": "weighted_pt",
-            }
+            columns=columns
         )
 
     cl3d = cl3d[cl3d.pt > kw["PtC3dThreshold"]] if "weights" not in kw.keys() else cl3d[cl3d.weighted_pt > kw["PtC3dThreshold"]]
@@ -84,6 +95,19 @@ def write_columns(df, kw):
         cl3d["weighted_eta"] = np.arcsinh(cl3d.weighted_z / weighted_cl3d_dist)
         cl3d["weighted_Rz"] = common.calcRzFromEta(cl3d.weighted_eta)
         cl3d["weighted_en"] = cl3d.weighted_pt * np.cosh(cl3d.weighted_eta)
+
+        tc_pt_per_layer = df.groupby("tc_layer").apply(lambda x: x.weighted_tc_pt.sum())
+        tc_pt_layer_frac = tc_pt_per_layer / tc_pt_per_layer.sum()
+        transv_size = df.groupby("tc_layer").apply(lambda x: np.sqrt(x.tc_x**2+x.tc_y**2).mean())
+        for layer in layers:
+            pt_col_name = "tc_pt_layer_" + str(layer) + "_frac"
+            rad_col_name = "r_layer_" + str(layer)
+            try:
+                cl3d[pt_col_name] = tc_pt_layer_frac.loc[layer]
+                cl3d[rad_col_name] = transv_size.loc[layer]
+            except KeyError:
+                cl3d[pt_col_name] = 0.0 # catch events with zero tcs in a given layer
+                cl3d[rad_col_name] = 0.0
 
     return cl3d
 
@@ -125,7 +149,6 @@ def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
 
         # checks if each event has at least one seed laying below the threshold
         thresh = dRs < np.expand_dims(minDist, axis=-1)
-
         if not (True in thresh):
             continue
 
@@ -166,8 +189,6 @@ def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
         assert len(cols) == res.shape[1]
 
         df = pd.DataFrame(res, columns=cols)
-        if df.empty:
-            breakpoint()
         assert not df.empty
 
         '''if "weights" in kw.keys():
@@ -204,8 +225,6 @@ def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
 
         cl3d = write_columns(df, kw)
 
-        #breakpoint()
-
         search_str = "{}_([0-9]{{1,7}})_tc".format(kw["FesAlgo"])
         event_number = re.search(search_str, tck)
         if not event_number:
@@ -216,6 +235,11 @@ def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
         cl3d_cols = ["en", "x", "y", "z", "Rz", "eta", "phi"]
         if "weights" in kw.keys():
             cl3d_cols = cl3d_cols + ["weighted_{}".format(col) for col in cl3d_cols]
+            cl3d_cols = cl3d_cols + [col for col in cl3d.keys() if "layer" in col]
+            '''for layer in layers:
+                col_name = "tc_pt_layer_" + str(layer) + "_frac"
+                cl3d_cols = cl3d_cols + [col_name]'''
+
         sout[key] = cl3d[cl3d_cols]
         if tck == tc_keys[0] and seedk == seed_keys[0]:
             dfout = cl3d[cl3d_cols + ["event"]]
@@ -225,6 +249,7 @@ def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
     print("[clustering step] There were {} events without seeds.".format(empty_seeds))
 
     splot = pd.HDFStore(out_plot, mode='w')
+    print("\nWriting: ", splot)
     if dfout is not None:
         dfout.event = dfout.event.astype(int)
         splot["data"] = dfout        
@@ -237,7 +262,10 @@ def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
     sout.close()
     stc.close()
     splot.close()
-    return nevents
+    if "returnDF" in kw.keys():
+        return nevents, dfout
+    else:
+        return nevents
 
 def cluster_default(pars, **kw):
     in_seeds  = common.fill_path(kw["ClusterInSeeds"], **pars)
@@ -247,8 +275,8 @@ def cluster_default(pars, **kw):
     return cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw)
     
 def cluster_roi(pars, **kw):
-    with open(params.CfgPath, 'r') as afile:
-        cfg = yaml.safe_load(afile)
+    '''with open(params.CfgPath, 'r') as afile:
+        cfg = yaml.safe_load(afile)'''
     extra_name = '_hexdist' if cfg['seed_roi']['hexDist'] else ''
     
     in_seeds  = common.fill_path(kw["ClusterInSeedsROI"] + extra_name, **pars)

@@ -22,7 +22,7 @@ def fill(pars, df_gen, df_cl, df_tc, **kw):
     """
     outfillplot = common.fill_path(kw['FillOutPlot'], **pars)
     outfillcomp = common.fill_path(kw['FillOutComp'], **pars)
-    with pd.HDFStore(outfillplot, mode='w') as store, pd.HDFStore(outfillcomp, mode='w') as storeComp:
+    with pd.HDFStore(outfillplot, mode='w') as storePlot, pd.HDFStore(outfillcomp, mode='w') as storeComp:
 
         df1 = data_process.baseline_selection(df_gen, df_cl, pars['sel'], **kw)
         assert(df1[df1.cl3d_eta<0].shape[0] == 0)
@@ -46,17 +46,19 @@ def fill(pars, df_gen, df_cl, df_tc, **kw):
         nansel = (pd.isna(df_tc.Rz_bin)) & (pd.isna(df_tc.tc_phi_bin))
         df_tc = df_tc[~nansel]
   
-        store[kw['FesAlgo'] + '_3d'] = df_3d
-        store[kw['FesAlgo'] + '_tc'] = df_tc
+        storePlot[kw['FesAlgo'] + '_3d'] = df_3d
+        storePlot[kw['FesAlgo'] + '_tc'] = df_tc
   
         dfs = (df_3d, df_tc)
             
     ### Event Processing ######################################################
     outfill = common.fill_path(kw['FillOut'], **pars)
 
+    bad_events = 0
     with h5py.File(outfill, mode='w') as store:
         group_tot = None
         df_3d, df_tc = dfs
+        total_events = len(df_tc['event'].unique().astype('int'))
         for ev in df_tc['event'].unique().astype('int'):
             ev_tc = df_tc[df_tc.event == ev]
             ev_3d = df_3d[df_3d.event == ev]
@@ -82,7 +84,11 @@ def fill(pars, df_gen, df_cl, df_tc, **kw):
             store_str = kw['FesAlgo'] + '_' + str(ev) + '_cl'
             cl3d_info = {'cl3d_eta': cl3d_eta, 'cl3d_phi': cl3d_phi,
                          'cl3d_rz': cl3d_rz, 'cl3d_en': cl3d_en}
-            store[store_str] = list(cl3d_info.values())
+            try:
+                store[store_str] = list(cl3d_info.values())
+            except ValueError:
+                bad_events += 1
+                continue
             store[store_str].attrs['columns'] = list(cl3d_info.keys())
             store[store_str].attrs['doc'] = 'CMSSW cluster info.'
             
@@ -119,6 +125,8 @@ def fill(pars, df_gen, df_cl, df_tc, **kw):
                 group_tot = group[:]
             else:
                 group_tot = pd.concat((group_tot, group[:]), axis=0)
+    
+    print("Percentage of bad events: ", bad_events/total_events)
 
     return group_tot
 

@@ -50,7 +50,6 @@ def seed(pars, debug=False, **kw):
     outseeding = common.fill_path(kw['SeedOut'], **pars)
     with open(params.CfgPath, 'r') as afile:
         cfg = yaml.safe_load(afile)
-
     with h5py.File(inseeding,  mode='r') as storeIn, h5py.File(outseeding, mode='w') as storeOut:
         bad_seeds=0
         for key in storeIn.keys():

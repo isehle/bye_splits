@@ -159,6 +159,7 @@ class EventData(BaseData):
             tree = f[self.indata.tree_path]
             allvars = set([y for x in self.var.values() for y in x.values()])
             data = tree.arrays(filter_name="/" + "|".join(allvars) + "/", library="ak")
+            pass
         # data[self.var.v] = data.waferv
         # data[self.newvar.vs] = -1 * data.waferv
         # data[self.newvar.c] = "#8a2be2"

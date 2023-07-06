@@ -8,4 +8,5 @@ particles=$2
 while read -r line; do
     radius=$(printf '%.*f\n' 3 "$line") #round to 3 sigfigs
     python calibration.py --radius "$radius" --particles "$particles"
+    #python calibration.py --radius "$radius" --particles "$particles" --pileup
 done <$coef_file

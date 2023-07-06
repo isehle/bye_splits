@@ -27,7 +27,8 @@ def binConv(vals, dist, amin):
 
 def calcRzFromEta(eta):
     """R/z = tan(theta) [theta is obtained from pseudo-rapidity, eta]"""
-    _theta = 2 * np.arctan(np.exp(-1 * eta))
+    #_theta = 2 * np.arctan(np.exp(-1 * eta))
+    _theta = 2 * np.arctan(np.exp(-1 * abs(eta)))
     return np.tan(_theta)
 
 def create_dir(p):

@@ -44,8 +44,6 @@ def assign_tcs(pars, **kw):
     empty_seeds = 0
 
     tc_info = {}
-    if pars.particles == "pions":
-        ecal_df = pd.DataFrame(columns=["ecal_cl_pt"])
     for tck, seedk in zip(tc_keys, seed_keys):
         tc = stc[tck]
         tc_cols = list(tc.attrs["columns"])
@@ -117,296 +115,272 @@ def assign_tcs(pars, **kw):
 
         event = int(event_number.group(1))
 
-        # Apply photon weights in ECAL to pions
-        if pars.particles == "pions":
-            hcal = df[ df.tc_layer >= 28 ]
-            ecal = df[ df.tc_layer < 28 ]
-            ecal = ecal.merge(cfg["phot_weights"], left_on="tc_layer", right_index=True)
-            ecal["tc_pt"] = ecal.tc_pt*ecal.weights
+        if len(df.seed_idx.unique()) > 1:
+            df = df.loc[ df.seed_energy == df.seed_energy.max() ]
 
-            try:
-                ecal_cl_pt={"ecal_cl_pt": ecal.tc_pt.sum()}
-                ecal_df.loc[event] = ecal_cl_pt
-            except AttributeError:
-                assert(ecal.empty)
-                continue
-            
-            try:
-                df = hcal.groupby(["seed_idx", "tc_layer"], group_keys=True).apply(lambda x: x.tc_pt.sum()).to_frame()
-            except AttributeError:
-                assert(hcal.empty)
-                continue
-        
-        else:
-            df = df.groupby(["seed_idx", "tc_layer"], group_keys=True).apply(lambda x: x.tc_pt.sum()).to_frame()
+        try:
+            #df = df.groupby(["seed_idx", "tc_layer"], group_keys=True).apply(lambda x: x.tc_pt.sum()).to_frame()
+            #df = df[ df.tc_layer > 28 ]
+            df = df.groupby(["tc_layer"], group_keys=True).apply(lambda x: x.tc_pt.sum()).to_frame()
+        except AttributeError:
+            assert(df.empty)
+            continue
         
         df.rename({0:"tc_pt_sum"},axis=1,inplace=1)
-        # Drop the first layer since this will be dominated by pile up
-        #df = df[ df.index.get_level_values("tc_layer") != 1.0 ]
+        df = df[ df.index.get_level_values("tc_layer") != 1.0 ]
 
-        if pars.particles == "pions":
+
+        '''if pars.particles == "pions":
             # Only calculate weights for HCAL
-            df = df[ df.index.get_level_values("tc_layer") > 27 ]
+            df = df[ df.index.get_level_values("tc_layer") > 28 ]
+        else:
+            #Drop the first layer since this will be dominated by pile up
+            df = df[ df.index.get_level_values("tc_layer") != 1.0 ]'''
 
         tc_info[event] = df
 
-    tc_df = pd.concat(tc_info, keys=tc_info.keys(), names=["event"])
+    layers = pd.concat(tc_info, keys=tc_info.keys(), names=["event"])
 
-    layers = tc_df.unstack(level="tc_layer")
-    layers=layers.fillna(0.0)
-    
-    if pars.particles != "pions":
-        return layers
-    else:
-        return layers, ecal_df
+    cl_pt = layers.groupby("event").apply(lambda x: x.tc_pt_sum.sum()).to_frame().rename({0: "cl_pt"}, axis=1)
+    #low_pt, high_pt = cl_pt.mean() - cl_pt.std(), cl_pt.mean() + cl_pt.std()
+    low_pt, high_pt = cl_pt.mean() - cl_helpers.effrms(cl_pt), cl_pt.mean() + cl_helpers.effrms(cl_pt)
+    cl_pt = cl_pt[ cl_pt.cl_pt >= float(low_pt) ]
+    cl_pt = cl_pt[ cl_pt.cl_pt <= float(high_pt) ]
+    layers = layers.loc[cl_pt.index]
 
-'''def selection(pars, cfg):
-    particles = pars.particles
-    radius = pars.radius
-    radius_str = "/coef_{}".format(str(radius).replace(".", "p"))
-
-    cfg_cl = cfg["clusterStudies"]
-
-    file = cfg_cl["optimization"]["files"][pars.particles][0]
-    reprocess = cfg_cl["reprocess"]
-    nevents = cfg_cl["nevents"]
-    
-    # Cuts
-    ptcut=cfg_cl["optimization"]["pt_cut"]
-    clptcut=cfg_cl["optimization"]["cl_pt_cut"]
-    etamin=cfg_cl["optimization"]["eta_min"]
-    etamax=cfg_cl["optimization"]["eta_max"]
-
-    with pd.HDFStore(file, mode="r") as clFile:
-        #df = clFile["data"]
-        #df = clFile[radius_str]
-        df = clFile[radius_str]["original"]
-        # Cut events that fall out of one sig from the mean
-        norm_min = df.pt_norm.mean() - df.pt_norm.std()
-        norm_max = df.pt_norm.mean() + df.pt_norm.std()
-        df = df[ df.pt_norm > norm_min ]
-        df = df[ df.pt_norm < norm_max ]
-        df = df[ df.matches == True ]
-        df.drop(["pt_norm","en_norm", "dR", "matches"],axis=1, inplace=True)
-
-    df = df[ df.gen_pt > ptcut ]
-    df = df[ df.gen_eta > etamin ]
-    df = df[ df.gen_eta < etamax ]
-
-    df = df[ df.pt > clptcut ]
-    df = df[ df.eta > etamin ]
-    df = df[ df.eta < etamax ]
-
-    _, _, ds_tc = data_process.get_data_reco_chain_start(nevents=nevents, reprocess=reprocess, particles=particles)
-
-    ds_tc.set_index("event", inplace=True)
-    sub_ds_tc = ds_tc[["tc_layer", "tc_pt"]]
-    joined = df.join(sub_ds_tc, on="event", how="inner")
-
-
-    return joined'''
+    return layers
 
 def select_gen_events(layers, pars, cfg):
     particles = pars.particles
 
     cfg_cl = cfg["clusterStudies"]
-
     reprocess = cfg_cl["reprocess"]
     nevents = cfg_cl["nevents"]
+
+    parquet_tag = cfg_cl["parquetTag"]
+
+    gen_pt_cut = cfg_cl["optimization"]["pt_cut"]
+    cl_pt_cut = cfg_cl["optimization"]["cl_pt_cut"]
+
+    eta_min, eta_max = cfg_cl["optimization"]["eta_min"], cfg_cl["optimization"]["eta_max"]
     
-    ds_gen, _, _ = data_process.get_data_reco_chain_start(nevents=nevents, reprocess=reprocess, particles=particles)
+    ds_gen, _, _ = data_process.get_data_reco_chain_start(nevents=nevents, reprocess=reprocess, particles=particles, tag=parquet_tag)
+    
+    ds_gen = ds_gen[ ds_gen.gen_eta > 0 ]
 
     ds_gen.set_index("event", inplace=True)
+
     ds_gen["gen_pt"] = ds_gen.gen_en/np.cosh(ds_gen.gen_eta)
 
-    sub_gen = ds_gen.loc[layers.index.get_level_values("event")]
+    ds_gen = ds_gen[ ds_gen.gen_pt > gen_pt_cut ]
+    ds_gen = ds_gen[ ds_gen.gen_eta > eta_min ]
+    ds_gen = ds_gen[ ds_gen.gen_eta < eta_max ]
 
-    if particles == "pions":
+    sub_layers = layers.groupby("event").apply(lambda x: x.tc_pt_sum.sum()).to_frame().rename({0: "cl_pt"}, axis=1)
+    sub_layers = sub_layers[ sub_layers.cl_pt > cl_pt_cut ]
+
+    layer_events = sub_layers.index.unique()
+    #layer_events = layers.index.get_level_values("event").unique()
+    gen_events = ds_gen.index
+    events = gen_events.intersection(layer_events)
+
+    ds_gen = ds_gen.loc[events]
+    layers = layers.loc[events]
+
+    sub_gen = ds_gen.groupby(level=0).apply(lambda x: x.gen_pt.mean())
+
+    return sub_gen, layers
+
+    '''if particles == "pions":
         ecal_cl_pt = cfg["ecal_cl_pt"]
         sub_gen = sub_gen.merge(ecal_cl_pt, left_index=True, right_index=True)
         sub_gen["hcal_cl_pt"] = sub_gen.gen_pt - sub_gen.ecal_cl_pt
-        return sub_gen["hcal_cl_pt"]
+        hcal_cl_pt = sub_gen.groupby(level=0).apply(lambda x: x.hcal_cl_pt.mean())
+        return hcal_cl_pt
     
     else:
-        return sub_gen["gen_pt"]
+        return sub_gen["gen_pt"]'''
 
-'''def optimize(df, as_df = True):
-    layers = df.groupby(["event", "seed_idx", "tc_layer"]).apply(lambda x: x.tc_pt.sum()).to_frame()
-    layers.rename({0: "pt"}, axis=1, inplace=True)
-    layer_array = layers.unstack(level="tc_layer")
-    layer_array = layer_array.fillna(0.0)
+def optimize(layers, gen_pt, radius):
+    layers = layers.sort_index(level="event")
+    layers = layers.unstack(level="tc_layer").fillna(0.0)
+
+    '''if radius < 0.005:
+        max_weight = 5.0
+    elif (radius >= 0.005 and radius <= 0.01):
+        max_weight = 3.0
+    else:
+        max_weight = 2.0'''
     
-    # We take the mean because each event contains identical copies
-    # of gen info for each tc_layer
-    gen_pts = df.groupby(["event", "seed_idx"]).apply(lambda x: x.gen_pt.mean())
+    max_weight = 5.0
 
-    regression = lsq_linear(layer_array, gen_pts,
-                            bounds = (0.,2.0),
-                            method='bvls',
-                            lsmr_tol='auto',
-                            verbose=1)
+    if not layers.empty:
 
-    weights = regression.x
+        regression = lsq_linear(layers, gen_pt,
+                                bounds = (0.,max_weight),
+                                method='bvls',
+                                lsmr_tol='auto',
+                                verbose=1)
 
-    if as_df:
-        index = layer_array.keys().get_level_values("tc_layer").to_list()
-        columns = ["weights"]
-        weights = pd.DataFrame(data = weights,
-                               index = index,
-                               columns = columns)
+        weights = regression.x
 
-    return weights'''
-
-def optimize(layers, gen_pt, as_df = True):
-
-    regression = lsq_linear(layers, gen_pt,
-                            bounds = (0.,5.0),
-                            method='bvls',
-                            lsmr_tol='auto',
-                            verbose=1)
-
-    weights = regression.x
-
-    if as_df:
         index = layers.keys().get_level_values("tc_layer").to_list()
         columns = ["weights"]
         weights = pd.DataFrame(data = weights,
-                               index = index,
-                               columns = columns)
+                    index = index,
+                    columns = columns)
+    else:
+        layer_index = [2*i+1 for i in range(14)]
+        weights = pd.DataFrame(index=layer_index, columns = ["weights"])
+        for layer in layer_index:
+            weights.loc[layer] = max_weight
 
     return weights
 
-'''def apply_weights(df, weights):
-    
-    new_df = df.groupby("event", group_keys=True).apply(lambda x: x.merge(weights,left_on="tc_layer",right_index=True))
-    new_df["weighted_tc_pt"] = new_df.tc_pt * new_df.weights
+def layer_weights(pars, cfg):
+    radius = pars.radius
 
-    weighted_cl_pt = new_df.groupby("event").apply(lambda x: x.weighted_tc_pt.sum()).to_frame()
-
-    new_df = new_df.groupby("event").apply(lambda x: x.merge(weighted_cl_pt, left_index=True, right_index=True))
-    new_df.rename({0: "weighted_pt"}, axis=1, inplace=True)
-    new_df.drop(["tc_layer","tc_pt","weights","weighted_tc_pt"],axis=1, inplace=True)
-    new_df = new_df.groupby("event").apply(max)
-    
-    return new_df'''
-
-def apply_weights(pars, cfg, weights):
-    radius = round(pars.radius, 3)
-    radius_str = "/coef_{}".format(str(radius).replace(".", "p"))
-
-    cfg_cl = cfg["clusterStudies"]
-
-    file = cfg_cl["optimization"]["files"][pars.particles][0]
-    
-    # Cuts
-    ptcut=cfg_cl["optimization"]["pt_cut"]
-    clptcut=cfg_cl["optimization"]["cl_pt_cut"]
-    etamin=cfg_cl["optimization"]["eta_min"]
-    etamax=cfg_cl["optimization"]["eta_max"]
-
-    with pd.HDFStore(file, mode="r") as clFile:
-        #df = clFile["data"]
-        #df = clFile[radius_str]
-        #df = clFile[radius_str]["original"]
-        # Cut events that fall out of one sig from the mean
-        norm_min = df.pt_norm.mean() - df.pt_norm.std()
-        norm_max = df.pt_norm.mean() + df.pt_norm.std()
-        df = df[ df.pt_norm > norm_min ]
-        df = df[ df.pt_norm < norm_max ]
-        df = df[ df.matches == True ]
-        df.drop(["pt_norm","en_norm", "dR", "matches"],axis=1, inplace=True)
-
-    df = df[ df.gen_pt > ptcut ]
-    df = df[ df.gen_eta > etamin ]
-    df = df[ df.gen_eta < etamax ]
-
-    df = df[ df.pt > clptcut ]
-    df = df[ df.eta > etamin ]
-    df = df[ df.eta < etamax ]
-
-    new_df = df.groupby("event", group_keys=True).apply(lambda x: x.merge(weights,left_on="tc_layer",right_index=True))
-    new_df["weighted_tc_pt"] = new_df.tc_pt * new_df.weights
-
-    weighted_cl_pt = new_df.groupby("event").apply(lambda x: x.weighted_tc_pt.sum()).to_frame()
-
-    new_df = new_df.groupby("event").apply(lambda x: x.merge(weighted_cl_pt, left_index=True, right_index=True))
-    new_df.rename({0: "weighted_pt"}, axis=1, inplace=True)
-    new_df.drop(["tc_layer","tc_pt","weights","weighted_tc_pt"],axis=1, inplace=True)
-    new_df = new_df.groupby("event").apply(max)
-    
-    return new_df
-
-def main(pars, cfg):
     cluster_d = params.read_task_params("cluster")
 
     cluster_d["CoeffA"] = [pars.radius] * 50
 
     for key in ("ClusterInTC", "ClusterInSeeds"):
         name = cluster_d[key]
-        cluster_d[key] =  "{}_PU0_{}".format(pars.particles, name)
-    
-    #cluster_d["phot_weights"] = cfg["phot_weights"]
+        cluster_d[key] =  "{}_PU0_{}_posEta".format(pars.particles, name)
+
+    layers = assign_tcs(pars, **cluster_d)
     
     # Assign TCs to Seeds and return pt sums / layer
-    if pars.particles == "pions":
+    '''if pars.particles == "pions":
+        cluster_d["phot_weights"] = cfg["phot_weights"]
         layers, ecal_cl_pt = assign_tcs(pars, **cluster_d)
         cfg["ecal_cl_pt"] = ecal_cl_pt
     else:
-        layers = assign_tcs(pars, **cluster_d)      
+        layers = assign_tcs(pars, **cluster_d) '''     
 
     # Get gen_pt for events found in layers
-    #init_df = selection(pars, cfg)
-    gen_pt = select_gen_events(layers, pars, cfg)
+    gen_pt, layers = select_gen_events(layers, pars, cfg)
 
     # Linear regression
-    #weights = optimize(init_df)
-    weights = optimize(layers, gen_pt)
+    weights = optimize(layers, gen_pt, radius)
 
+    weights.loc[1.0] = 1.0
+    weights.sort_index(inplace=True)
+
+    '''if pars.particles != "pions":
     # Weights are calculate for layers >= 3, add a "weight" of 1 to the first layer
-    if pars.particles != "pions":
         weights.loc[1.0] = 1.0
-        weights.sort_index(inplace=True)
+        weights.sort_index(inplace=True)'''
 
-    #final_df = apply_weights(init_df, weights)
-    #final_df = apply_weights(pars, cfg, weights)
-
-    #return weights, final_df
     return weights
 
+def eta_correction(df_pu):
+    X = df_pu[["eta"]]
+    y = df_pu.gen_pt - df_pu.pt
+    corr = LinearRegression().fit(X, y)
+    return corr
+
+def apply_eta_corr(df_pu, corr):
+    if not isinstance(corr, pd.DataFrame):
+        df_pu["eta_corr_to_pt"] = corr.predict(df_pu[["eta"]])
+    else:
+        df_pu["intercept"], df_pu["coef"] = corr.intercept_.iloc[0], corr.coef_.iloc[0]
+        df_pu["eta_corr_to_pt"] = df_pu["intercept"] + df_pu["eta"]*df_pu["coef"]
+        df_pu.drop(["intercept", "coef"], axis=1, inplace=True)
+    df_pu["pt_corr_eta"] = df_pu.eta_corr_to_pt + df_pu.pt
+    df_pu["pt_norm"] = df_pu.pt / df_pu.gen_pt
+    df_pu["pt_norm_eta_corr"] = df_pu.pt_corr_eta / df_pu.gen_pt
+    return df_pu
+
+def eta_corr_per_rad(clFile, etaFile, radius, eta_corr = None):
+    dfs = clFile[radius]
+
+    df_cl = dfs["weighted"]
+    df_cl = df_cl[ df_cl.matches == True ]
+
+    corr = eta_correction(df_cl) if not isinstance(eta_corr, pd.DataFrame) else eta_corr
+    new_df = apply_eta_corr(df_cl, corr)
+
+    dfs["weighted"] = new_df
+
+    if not isinstance(eta_corr, pd.DataFrame):
+        etaFile[radius] = pd.DataFrame.from_dict(corr.__dict__)
+
+    clFile[radius] = dfs
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--particles", choices=("photons", "electrons", "pions"), required=True)
-    parser.add_argument("--radius", help="clustering radius to use: (0.0, 0.05]", required=True, type=float)
+    #parser.add_argument("--radius", help="clustering radius to use: (0.0, 0.05]", required=True, type=float)
+    parser.add_argument("--radius", help="clustering radius to use: (0.0, 0.05]", type=float)
     parser.add_argument("--pileup", help="tag for PU200 vs PU0", action="store_true")
+    parser.add_argument("--etaCal", help="path to eta-calibration file", type=str)
     parsing.add_parameters(parser)
 
     FLAGS = parser.parse_args()
     pars = common.dot_dict(vars(FLAGS))
 
-    phot_dir = "{}/PU0/photons/optimization/official/final/".format(cfg["clusterStudies"]["localDir"])
-    out_dir = "{}/PU0/{}/optimization/official/final/".format(cfg["clusterStudies"]["localDir"], pars.particles)
+    pileup_dir = "PU0" if not pars.pileup else "PU200"
 
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
-
-    radius_str = str(round(pars.radius, 4)).replace(".", "p")
+    if pars.radius != None:
+        radius_str = str(round(pars.radius, 4)).replace(".", "p")
     
-    phot_name = "{}/{}_r{}.hdf5".format(phot_dir, "optimization_final", radius_str)
-    file_name = "{}/{}_r{}.hdf5".format(out_dir, cfg["clusterStudies"]["optimization"]["baseName"], radius_str)
+    if not pars.pileup:
+        out_dir = "{}/{}/{}/optimization/official/final/".format(cfg["clusterStudies"]["localDir"], pileup_dir, pars.particles)
+        os.makedirs(out_dir, exist_ok=True)
 
-    with pd.HDFStore(phot_name,"r") as photWeights:
-        phot_weights = photWeights["weights"]
+        file_layer_weights = "{}/{}_bc_stc_r{}.hdf5".format(out_dir, cfg["clusterStudies"]["optimization"]["baseName"], radius_str)
 
-    cfg["phot_weights"] = phot_weights
+        '''if pars.particles == "pions":
+            phot_dir = "{}/PU0/photons/optimization/official/final/".format(cfg["clusterStudies"]["localDir"])
+            phot_name = "{}/{}_r{}.hdf5".format(phot_dir, "optimization_final", radius_str)
+            with pd.HDFStore(phot_name,"r") as photWeights:
+                phot_weights = photWeights["weights"]
 
-    if not os.path.exists(file_name):
-        #weights, df = main(pars, cfg)
-        weights = main(pars, cfg)
-        with pd.HDFStore(file_name, mode="w") as outOpt:
-            outOpt["weights"] = pd.concat([phot_weights, weights])
-            #outOpt["weights"] = weights
-            #outOpt["df"] = df
+            cfg["phot_weights"] = phot_weights'''
+        
+        if not os.path.exists(file_layer_weights):
+            weights = layer_weights(pars, cfg)
+            with pd.HDFStore(file_layer_weights, mode="w") as outOpt:
+                #outOpt["weights"] = pd.concat([phot_weights, weights]) if pars.particles=="pions" else weights
+                outOpt["weights"] = weights
+        else:
+            print("\n{} already exists, skipping\n.".format(file_layer_weights))
+
     else:
-        print("\n{} already exists, skipping\n.".format(file_name))
+        if pars.radius != None:
+            radius_key = "coef_{}".format(radius_str)
+        #cl_file = cfg["clusterStudies"]["optimization"]["PU200"][pars.particles]
+        #cl_file = "/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/photons/cluster_size_etaCal_test.hdf5"
+        #cl_file = "data/new_algos/PU200/electrons/cluster_size_negEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5"
+        cl_file = "data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/posEta/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5"
+
+        if pars.etaCal == None:
+            eta_file = os.path.dirname(cl_file) + "/etaCorr_new.hdf5"
+            print("\nWriting: ", eta_file)
+            with pd.HDFStore(cl_file, "a") as clFile:
+                if pars.radius != None:
+                    with pd.HDFStore(eta_file, "w") as etaFile:
+                        eta_corr_per_rad(clFile, etaFile, radius_key)
+
+                else:
+                    for radius in clFile.keys():
+                        if radius == clFile.keys()[0]:
+                            with pd.HDFStore(eta_file, "w") as etaFile:
+                                eta_corr_per_rad(clFile, etaFile, radius)
+                        else:
+                            with pd.HDFStore(eta_file, "a") as etaFile:
+                                eta_corr_per_rad(clFile, etaFile, radius)
+
+        else:
+            eta_file = pars.etaCal
+            with pd.HDFStore(cl_file, "a") as clFile, pd.HDFStore(eta_file, "r") as etaFile:
+                if pars.radius != None:
+                    eta_corr = etaFile[radius_key]
+                    eta_corr_per_rad(clFile, etaFile, radius_key, eta_corr=eta_corr)
+                    
+                else:
+                    for radius in etaFile.keys():
+                        eta_corr = etaFile[radius]
+                        eta_corr_per_rad(clFile, etaFile, radius, eta_corr=eta_corr)
     

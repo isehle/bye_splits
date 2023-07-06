@@ -220,8 +220,8 @@ if __name__ == "__main__":
     job.prepare_jobs()
     job.launch_jobs()
 
-    #for particle in ("photons", "electrons", "pions"):
-    '''for particle in ("electrons", "pions"):
+    '''for particle in ("photons", "electrons", "pions"):
+    #for particle in ("photons", "electrons"):
         job = CondJob(particle, config)
         job.prepare_jobs()
         job.launch_jobs()'''

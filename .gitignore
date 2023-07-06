@@ -36,3 +36,6 @@ docs/tikz/*pdf
 *.DS_Store
 *.d
 *.diff
+for_me/
+misc/
+plots/

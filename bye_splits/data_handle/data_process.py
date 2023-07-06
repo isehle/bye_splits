@@ -23,7 +23,8 @@ from data_handle.data_input import InputData
 
 def baseline_selection(df_gen, df_cl, sel, **kw):
     data = pd.merge(left=df_gen, right=df_cl, how='inner', on='event')
-    data = data[(data.gen_eta>kw['EtaMin']) & (data.gen_eta<kw['EtaMax'])]
+    #data = data[(data.gen_eta>kw['EtaMin']) & (data.gen_eta<kw['EtaMax'])]
+    data = data[(abs(data.gen_eta)>kw['EtaMin']) & (abs(data.gen_eta)<kw['EtaMax'])]
     
     if sel.startswith('above_eta_'):
         data = data[data.gen_eta > float(sel.split('above_eta_')[1])]
@@ -74,7 +75,7 @@ def baseline_selection(df_gen, df_cl, sel, **kw):
 
 def get_data_reco_chain_start(nevents=500, reprocess=False, tag='chain', particles=None):
     """Access event data."""
-    data_part_opt = dict(tag=tag, reprocess=reprocess, debug=True, particles=particles)
+    data_part_opt = dict(tag=tag, reprocess=reprocess, debug=False, particles=particles)
     data_particle = EventDataParticle(**data_part_opt)
     ds_all, events = data_particle.provide_random_events(n=nevents, seed=42)
     # ds_all = data_particle.provide_events(events=[170004, 170015, 170017, 170014])
@@ -106,18 +107,18 @@ def get_data_reco_chain_start(nevents=500, reprocess=False, tag='chain', particl
         "good_genpart_exeta": "gen_eta",
         "good_genpart_exphi": "gen_phi",
         "good_genpart_energy": "gen_en",
-        "good_tc_layer": "gen_layer",
     }
     ds_gen = ds_all["gen"]
     ds_gen = ds_gen.rename(columns=gen_keep)
 
     cl_keep = {
         "event": "event",
+        "matches": "matches",
+        "deltaR": "deltaR",
         "good_cl3d_eta": "cl3d_eta",
         "good_cl3d_phi": "cl3d_phi",
         "good_cl3d_id": "cl3d_id",
         "good_cl3d_energy": "cl3d_en",
-        "good_tc_layer": "cl3d_layer"
     }
     ds_cl = ds_all["cl"]
     ds_cl = ds_cl.rename(columns=cl_keep)

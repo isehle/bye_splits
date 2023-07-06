@@ -69,14 +69,15 @@ def plot_weights(radius, mode):
 
     for particle in particles:
         weights = weights_by_particle[particle][radius]
+        #weights = weights[ weights.index <= 28 ]
         if mode == "Weights":
             fig.add_trace(
-                go.Bar(
+                go.Scatter(
                 name=particle,
                 x=weights.index,
                 y=weights.weights,
-                text=weights.weights,
-                textposition="auto"
+                #text=weights.weights,
+                #textposition="auto"
                 ),
                 row=1 if particle != "pions" else 2,
                 col=1
