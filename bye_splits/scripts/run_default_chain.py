@@ -28,6 +28,7 @@ def run_default_chain(pars, user):
     collector = validation.Collector()
     plotter = chain_plotter.ChainPlotter(chain_mode='default', user=user,
                                          tag='NEV'+str(pars.nevents))
+    
     df_gen, df_cl, df_tc = get_data_reco_chain_start(nevents=pars.nevents,
                                                      reprocess=True, tag="default_chain")
 
@@ -93,4 +94,5 @@ if __name__ == "__main__":
     assert (FLAGS.sel in ("splits_only", "no_splits", "all") or
             FLAGS.sel.startswith("above_eta_"))
 
-    run_default_chain(common.dot_dict(vars(FLAGS)), user='bfontana')
+    #run_default_chain(common.dot_dict(vars(FLAGS)), user='bfontana')
+    run_default_chain(common.dot_dict(vars(FLAGS)), user='iehle')

@@ -1,10 +1,12 @@
 io:
   dirphotons: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
   treephotons: HGCalTriggerNtuple
-  filephotons: /eos/user/b/bfontana/FPGAs/new_algos/skim_with_pt_ntuple_1.root #skim_photons_0PU_bc_stc_hadd.root
+  #filephotons: /eos/user/b/bfontana/FPGAs/new_algos/skim_with_pt_ntuple_1.root #skim_photons_0PU_bc_stc_hadd.root
+  filephotons: /data_CMS/cms/ehle/L1HGCAL/PU200/photons/skims/skim_tightTC_dRxy_posEta_withGenPT_photons_200PU_bc_stc_hadd.root
   direlectrons: hgcalTriggerNtuplizer
   treeelectrons: HGCalTriggerNtuple
   fileelectrons: /eos/user/i/iehle/data/PU0/electrons/skim_electrons_0PU_bc_stc_hadd.root
+  fileelectrons: /data_CMS/cms/ehle/L1HGCAL/PU200/electrons/skims/skim_tightTC_dRxy_fullEta_electrons_200PU_bc_stc_hadd.root
   dirpions: hgcalTriggerNtuplizer
   treepions: HGCalTriggerNtuple
   filepions: /eos/user/i/iehle/data/PU0/pions/skim_pions_0PU_new_hadd.root
@@ -29,6 +31,14 @@ defaultEvents:
     photons: [170032, 170044]
     electrons: [92243, 92244]
     pions: [9102, 9148]
+
+skim:
+    inDir: /data_CMS/cms/ehle/L1HGCAL/PU200/
+    outDir: /data_CMS/cms/ehle/L1HGCAL/PU200/
+    rootDir: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
+    tree: HGCalTriggerNtuple
+    tcDeltaRThresh: 0.1
+    outfileBaseName: tightTC_dRxy_posEta
 
 varEvents:
   gen:
