@@ -216,12 +216,12 @@ if __name__ == "__main__":
     with open(params.CfgPath, "r") as afile:
         config = yaml.safe_load(afile)
 
-    job = CondJob("pions", config)
+    '''job = CondJob("phons", config)
     job.prepare_jobs()
-    job.launch_jobs()
+    job.launch_jobs()'''
 
-    '''for particle in ("photons", "electrons", "pions"):
+    for particle in ("photons", "electrons", "pions"):
     #for particle in ("photons", "electrons"):
         job = CondJob(particle, config)
         job.prepare_jobs()
-        job.launch_jobs()'''
+        job.launch_jobs()

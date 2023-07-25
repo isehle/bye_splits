@@ -85,21 +85,22 @@ def plot_norm(
     
     df_original, df_weighted = cl_helpers.get_dataframes(init_files, particle, coef, eta_range, pt_cut)
 
+    #df_original, df_weighted = df_original[ df_original.gen_pt < 50 ], df_weighted[ df_weighted.gen_pt < 50 ]
+
     fig = make_subplots(rows=1, cols=2, subplot_titles=("PT Norm Vs Gen Pt", "PT Norm Vs Gen Eta"))
     vals = {}
     pt_plot_args = {"traces": {"111": {}}}
     eta_plot_args = {"traces": {"111": {}}}
     y_axis_title = r"$<\frac{{p_T}^{Cl}}{{p_T}^{Gen}}>$" if particle != "electrons" else r"$mode(\frac{{p_T}^{Cl}}{{p_T}^{Gen}})$"
     for key, df in zip(("original", "weighted"), (df_original, df_weighted)):
-        bins = 20 if particle != "pions" else 5
+        bins = 20 if particle != "pions" else 20
 
         df["gen_pt_bin"] = pd.cut(df.gen_pt, bins=bins, labels=False)
         df["gen_eta_bin"] = pd.cut(df.gen_eta, bins=bins, labels=False)
 
         if ((pileup_key == "PU200") & (key == "weighted")):
             norm_cols = ["pt_norm", "pt_norm_eta_corr"]
-            print(df.keys())
-            sub_df  = df[["eta", "gen_eta", "gen_eta_bin", "pt", "gen_pt", "pt_norm", "pt_norm_eta_corr", "gen_pt_bin"]].reset_index()
+            sub_df  = df[["eta", "gen_eta", "gen_eta_bin", "pt", "pt_corr_eta", "gen_pt", "pt_norm", "pt_norm_eta_corr", "gen_pt_bin"]].reset_index()
         else:
             norm_cols = ["pt_norm"]
             sub_df  = df[["eta", "gen_eta", "gen_eta_bin", "pt", "gen_pt", "pt_norm", "gen_pt_bin"]].reset_index()
@@ -126,6 +127,11 @@ def plot_norm(
             else:
                 avg_pt_vs_gen_pt = sub_df.groupby("gen_pt_bin").apply(lambda x: x[col].mean())
                 avg_pt_vs_gen_eta = sub_df.groupby("gen_eta_bin").apply(lambda x: x[col].mean())
+                pt_diff_vs_gen_eta = sub_df.groupby("gen_eta_bin").apply(lambda x: x.gen_pt.mean())
+                '''if col != "pt_norm_eta_corr":
+                    pt_diff_vs_gen_eta = sub_df.groupby("gen_eta_bin").apply(lambda x: (x.pt - x.gen_pt).mean())
+                else:
+                    pt_diff_vs_gen_eta = sub_df.groupby("gen_eta_bin").apply(lambda x: (x.pt_corr_eta - x.gen_pt).mean())'''
 
             _, rel_pt_err_vs_gen_pt = cl_helpers.rel_err(sub_df, col, bin_col="gen_pt_bin")
             _, rel_pt_err_vs_gen_eta = cl_helpers.rel_err(sub_df, col, bin_col="gen_eta_bin")
@@ -134,21 +140,23 @@ def plot_norm(
             pt_norm_err_vs_gen_eta = avg_pt_vs_gen_eta*np.sqrt(rel_pt_err_vs_gen_eta**2+rel_gen_pt_err**2)
 
             pt_df = pd.DataFrame.from_dict({"gen_pt": gen_pt, "pt_norm": avg_pt_vs_gen_pt})
-            eta_df = pd.DataFrame.from_dict({"gen_eta": gen_eta, "pt_norm": avg_pt_vs_gen_eta})
+            #eta_df = pd.DataFrame.from_dict({"gen_eta": gen_eta, "pt_norm": avg_pt_vs_gen_eta})
+            eta_df = pd.DataFrame.from_dict({"gen_eta": gen_eta, "pt_diff": pt_diff_vs_gen_eta})
 
             means = {"pt": pt_df, "eta": eta_df}
 
             vals[key] = means
 
             pt_plot_args["traces"]["111"][legend_name] = {"plot_type": "scatter",
-                                                          "x_data": vals[key]["pt"]["gen_pt"],
-                                                          "y_data": vals[key]["pt"]["pt_norm"],
-                                                          "x_title": r"${p_T}^{Gen}$",
-                                                          "y_title": y_axis_title,
-                                                          "color": color,
-                                                          #"xerr": gen_pt_err,
-                                                          #"yerr": pt_norm_err_vs_gen_pt
-                                                          }
+                                                            "x_data": vals[key]["pt"]["gen_pt"],
+                                                            "y_data": vals[key]["pt"]["pt_norm"],
+                                                            "x_title": r"${p_T}^{Gen}$",
+                                                            "y_title": y_axis_title,
+                                                            "color": color,
+                                                            #"xerr": gen_pt_err,
+                                                            #"yerr": pt_norm_err_vs_gen_pt
+                                                            }
+
             fig.add_trace(
                 go.Scatter(
                     x = vals[key]["pt"]["gen_pt"],
@@ -171,20 +179,25 @@ def plot_norm(
                 col=1
             )
 
+            temp_y = r"$<{p_T}^{Gen}>$"
             eta_plot_args["traces"]["111"][legend_name] = {"plot_type": "scatter",
                                                            "x_data": vals[key]["eta"]["gen_eta"],
-                                                           "y_data": vals[key]["eta"]["pt_norm"],
+                                                           #"y_data": vals[key]["eta"]["pt_norm"],
+                                                           "y_data": vals[key]["eta"]["pt_diff"],
                                                            "x_title": r"$|{\eta}^{Gen}|$",
+                                                           #"y_title": temp_y,
                                                            "y_title": y_axis_title,
                                                            "color": color,
                                                            #"xerr": gen_eta_err,
                                                            #"yerr": pt_norm_err_vs_gen_eta
-                                                           }
+                                                           }               
 
+            print(legend_name)
             fig.add_trace(
                 go.Scatter(
                     x = vals[key]["eta"]["gen_eta"],
-                    y = vals[key]["eta"]["pt_norm"],
+                    #y = vals[key]["eta"]["pt_norm"],
+                    y = vals[key]["eta"]["pt_diff"],
                     name = legend_name + " ( |eta| )",
                     line = dict(color=color),
                     mode = "markers",
@@ -223,38 +236,35 @@ def plot_norm(
         yaxis_title_text=y_axis_title,
     )
 
-    #pt_text = r"${p_T}^{Gen} > $" + r"${}$".format(pt_cut)
-    #eta_text = r"${} < \eta < {}$".format(eta_range[0], eta_range[1])
+    if particle == "photons":
+        part_sym = r"$\gamma \: $"
+    elif particle == "electrons":
+        part_sym = r"$e \: $"
+    elif particle == "pions":
+        part_sym = r"$\pi \: $"
 
-    pt_text = cl_plot_funcs.pt_text(pt_cut)
-    eta_text = cl_plot_funcs.eta_text(eta_range)
-    radius_text = cl_plot_funcs.radius_text(coef)
+    #eta_plot_args["hline"] = {"val": 1.0, "color": "black", "linestyle": "--"}
+    #eta_plot_args["hline"] = {"val": 0.0, "color": "black", "linestyle": "--"}
+    pt_plot_args["hline"] = {"val": 1.0, "color": "black", "linestyle": "--"}
 
-    pt_plot_args["eta_text"] = eta_text
-    pt_plot_args["pt_text"] = pt_text
-    pt_plot_args["radius_text"] = radius_text
-
-    eta_plot_args["eta_text"] = eta_text
-    eta_plot_args["pt_text"] = pt_text
-    eta_plot_args["radius_text"] = radius_text
-
-    pt_plot_title = r"$p_T \: Response \: vs. \: {p_T}^{Gen}$"
+    pt_plot_title = part_sym + r"$p_T \: Response \: vs. \: {p_T}^{Gen}$"
     pt_plot_title = cl_plot_funcs.title(pt_plot_title, pileup_key)
 
-    pt_plot_path = "plots/png/pT_response_vs_PT_{}_eta_{}_{}_ptGtr_{}_{}_err.png"
+    pt_plot_path = "plots/png/pT_response_vs_PT_{}_eta_{}_{}_ptGtr_{}_{}_bc_stc.png"
     pt_plot_path = cl_plot_funcs.path(pt_plot_path, pileup_key, eta_range, pt_cut, particle)
 
-    eta_plot_title = r"$p_T \: Response \: vs. \: |{\eta}^{Gen}|$"
+    eta_plot_title = part_sym + r"${p_T}^{Gen} \: \: vs. \: |{\eta}^{Gen}|$"
     eta_plot_title = cl_plot_funcs.title(eta_plot_title, pileup_key)
 
-    eta_plot_path = "plots/png/pT_response_vs_Eta_{}_eta_{}_{}_ptGtr_{}_{}_err.png"
+    eta_plot_path = "plots/png/pT_response_vs_Eta_{}_eta_{}_{}_ptGtr_{}_{}_bc_stc_18juillet.png"
+    #eta_plot_path = "plots/png/genPT_vs_Eta_{}_eta_{}_{}_ptGtr_{}_{}_bc_stc.png"
     eta_plot_path = cl_plot_funcs.path(eta_plot_path, pileup_key, eta_range, pt_cut, particle)
 
     pt_cms_plot = cl_plot_funcs.cmsPlot(pt_plot_title, pt_plot_path, **pt_plot_args)
     eta_cms_plot = cl_plot_funcs.cmsPlot(eta_plot_title, eta_plot_path, **eta_plot_args)
 
     if download > 0:
-        pt_cms_plot.write_fig()
+        #pt_cms_plot.write_fig()
         eta_cms_plot.write_fig()
 
     return fig

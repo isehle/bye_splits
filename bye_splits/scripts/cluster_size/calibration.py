@@ -296,7 +296,11 @@ def eta_corr_per_rad(clFile, etaFile, radius, eta_corr = None):
     dfs = clFile[radius]
 
     df_cl = dfs["weighted"]
-    df_cl = df_cl[ df_cl.matches == True ]
+
+    upper_eff = df_cl.pt_norm.mean() + cl_helpers.effrms(df_cl.pt_norm.to_frame().rename({0: "pt_norm"}))
+    lower_eff = df_cl.pt_norm.mean() - cl_helpers.effrms(df_cl.pt_norm.to_frame().rename({0: "pt_norm"}))
+
+    df_cl = df_cl[ (df_cl.pt_norm > lower_eff) & (df_cl.pt_norm < upper_eff) ]
 
     corr = eta_correction(df_cl) if not isinstance(eta_corr, pd.DataFrame) else eta_corr
     new_df = apply_eta_corr(df_cl, corr)
@@ -353,10 +357,12 @@ if __name__ == "__main__":
         #cl_file = cfg["clusterStudies"]["optimization"]["PU200"][pars.particles]
         #cl_file = "/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/photons/cluster_size_etaCal_test.hdf5"
         #cl_file = "data/new_algos/PU200/electrons/cluster_size_negEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5"
-        cl_file = "data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/posEta/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5"
+        #cl_file = "data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/posEta/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5"
+        #cl_file = "data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5"
+        cl_file = "data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/negEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5"
 
         if pars.etaCal == None:
-            eta_file = os.path.dirname(cl_file) + "/etaCorr_new.hdf5"
+            eta_file = os.path.dirname(cl_file) + "/etaCorr_fromCenter_new.hdf5"
             print("\nWriting: ", eta_file)
             with pd.HDFStore(cl_file, "a") as clFile:
                 if pars.radius != None:

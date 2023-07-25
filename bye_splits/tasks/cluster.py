@@ -21,8 +21,8 @@ import h5py
 with open(params.CfgPath, 'r') as afile:
         cfg = yaml.safe_load(afile)
 
-layers = cfg["selection"]["disconnectedTriggerLayers"]
-layers = [l-1 for l in layers]
+#layers = cfg["selection"]["disconnectedTriggerLayers"]
+#layers = np.asarray([l-1 for l in layers])
 
 def write_columns(df, kw):
     if "weights" in kw.keys():
@@ -47,6 +47,29 @@ def write_columns(df, kw):
         #cl3d = df.groupby(["seed_idx"], group_keys=True).sum()[cl3d_cols]
         # While the above should be equivalent, for some reason it drops the weighted columns, resulting in a KeyError
     cl3d = df.groupby(["seed_idx"], group_keys=True).apply(lambda x: x.sum())[cl3d_cols]
+    
+    dR_by_layer = df.groupby(["seed_idx", "tc_layer"],group_keys=True).apply(lambda x: x.seed_dRs.mean())
+    for seed in dR_by_layer.index.get_level_values("seed_idx"):
+        dR_layers = dR_by_layer.loc[seed].index
+        layers_no_vals = np.setdiff1d(layers, dR_layers)
+        for layer in layers_no_vals:
+            #dR_by_layer.loc[seed, layer] = 0.0
+            dR_by_layer.loc[seed, layer] = np.NaN
+    
+    dR_by_layer.sort_index(inplace=True)
+
+    for seed, layer in dR_by_layer.index:
+        dR = dR_by_layer.loc[seed, layer]
+        '''if dR == 0:
+            shift = 2.0 if layer < 28 else 1.0
+            layer_min = layer-shift if layer != 1.0 else layer
+            #layer_max = layer+shift if layer != 50.0 else layer
+            layer_max = layer+shift if layer != 27.0 else layer
+            dR = (dR_by_layer.loc[seed, layer_min] + dR_by_layer.loc[seed, layer_max])/2'''
+        
+        col_name = "layer_" + str(int(layer)) + "_dR"
+        cl3d[col_name] = dR
+    
     cl3d = cl3d.rename(
         columns={
             "cl3d_pos_x": "x",
@@ -108,7 +131,6 @@ def write_columns(df, kw):
             except KeyError:
                 cl3d[pt_col_name] = 0.0 # catch events with zero tcs in a given layer
                 cl3d[rad_col_name] = 0.0
-
     return cl3d
 
 def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
@@ -123,6 +145,15 @@ def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
 
     radiusCoeffB = kw["CoeffB"]
     empty_seeds = 0
+    bad_seeds = 0
+    
+    global layers
+    layers = cfg["selection"]["disconnectedTriggerLayers"]
+    layers = np.asarray([l-1 for l in layers])
+
+    if "pion" in in_seeds:
+        hcal_layers = np.asarray([i for i in range(28,51)])
+        layers = np.concatenate((layers, hcal_layers))
 
     for tck, seedk in zip(tc_keys, seed_keys):
         tc = stc[tck]
@@ -175,17 +206,21 @@ def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
                 raise
 
         seeds_energies = np.array([seedEn[xi] for xi in seeds_indexes])
+        seeds_dRs = np.array([dRs[xi] for xi in seeds_indexes])
         # axis 0 stands for trigger cells
         assert tc[:].shape[0] == seeds_energies.shape[0]
-
+        
         seeds_indexes = np.expand_dims(seeds_indexes[thresh], axis=-1)
         seeds_energies = np.expand_dims(seeds_energies[thresh], axis=-1)
+        #seeds_dRs = np.expand_dims(seeds_dRs[thresh], axis=-1)
+        seeds_dRs = dRs[thresh]
+        seeds_dRs = seeds_dRs[np.arange(len(seeds_indexes)), seeds_indexes[:,0]].reshape(-1,1)
         tc = tc[:][thresh]
 
-        res = np.concatenate((tc, seeds_indexes, seeds_energies), axis=1)
+        res = np.concatenate((tc, seeds_indexes, seeds_energies, seeds_dRs), axis=1)
 
         key = tck.replace("_tc", "_cl")
-        cols = tc_cols + ["seed_idx", "seed_energy"]
+        cols = tc_cols + ["seed_idx", "seed_energy", "seed_dRs"]
         assert len(cols) == res.shape[1]
 
         df = pd.DataFrame(res, columns=cols)
@@ -222,7 +257,7 @@ def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
         cl3d["eta"] = np.arcsinh(cl3d.z / cl3d_dist)
         cl3d["Rz"] = common.calcRzFromEta(cl3d.eta)
         cl3d["en"] = cl3d.pt * np.cosh(cl3d.eta)'''
-
+        
         cl3d = write_columns(df, kw)
 
         search_str = "{}_([0-9]{{1,7}})_tc".format(kw["FesAlgo"])
@@ -233,6 +268,8 @@ def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
 
         cl3d["event"] = event_number.group(1)
         cl3d_cols = ["en", "x", "y", "z", "Rz", "eta", "phi"]
+        layer_dRs = ["layer_{}_dR".format(l) for l in layers]
+        cl3d_cols = cl3d_cols + layer_dRs
         if "weights" in kw.keys():
             cl3d_cols = cl3d_cols + ["weighted_{}".format(col) for col in cl3d_cols]
             cl3d_cols = cl3d_cols + [col for col in cl3d.keys() if "layer" in col]
@@ -247,6 +284,7 @@ def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
             dfout = pd.concat((dfout, cl3d[cl3d_cols + ["event"]]), axis=0)
 
     print("[clustering step] There were {} events without seeds.".format(empty_seeds))
+    print("[clustering step] Bad seeds: {}%.".format(bad_seeds/len(seedk)))
 
     splot = pd.HDFStore(out_plot, mode='w')
     print("\nWriting: ", splot)

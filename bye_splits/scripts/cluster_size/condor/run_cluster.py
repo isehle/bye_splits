@@ -33,13 +33,13 @@ def cluster_coef(pars, cfg):
     )
     cluster_d["ClusterOutPlot"], cluster_d["ClusterOutValidation"] = cl_size_coef, cl_size_coef+"_valid"
     cluster_d["CoeffA"] = [coef] * 50
-    cluster_d["weights"] = cfg["weights"]
+    #cluster_d["weights"] = cfg["weights"]
 
     for key in ("ClusterInTC", "ClusterInSeeds", "ClusterOutPlot", "ClusterOutValidation"):
         name = cluster_d[key]
 
-        cluster_d[key] =  "{}_{}_{}_negEta".format(particles, pileup, name)
-        
+        cluster_d[key] =  "{}_{}_{}_posEta".format(particles, pileup, name)
+    
     nevents_end = tasks.cluster.cluster_default(pars, **cluster_d)
 
 if __name__ == "__main__":
@@ -57,9 +57,9 @@ if __name__ == "__main__":
     with open(params.CfgPath, "r") as afile:
         cfg = yaml.safe_load(afile)
 
-    weight_dir = "{}/PU0/".format(params.LocalStorage)
+    '''weight_dir = "{}/PU0/".format(params.LocalStorage)
     weights_by_particle = cl_helpers.read_weights(weight_dir, cfg)
     weights = weights_by_particle[pars.particles][radius]
-    cfg["weights"] = weights
+    cfg["weights"] = weights'''
     
     cluster_coef(pars, cfg)

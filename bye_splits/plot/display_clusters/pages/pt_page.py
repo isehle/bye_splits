@@ -39,14 +39,16 @@ layout = html.Div(
         html.Br(),
         dcc.Tabs(
             id = "particle",
-            value = "photons",
+            #value = "photons",
+            #value = "electrons",
+            value = "pions",
             children = [
                 dcc.Tab(label = "Photons", value = "photons"),
                 dcc.Tab(label = "Electrons", value = "electrons"),
                 dcc.Tab(label = "Pions", value = "pions")
                 ]
         ),
-        html.Div([dbc.Button("Pile Up", id="pileup", color="primary", n_clicks=0),
+        html.Div([dbc.Button("Pile Up", id="pileup", color="primary", n_clicks=1),
                   dcc.Input(id="pt_cut", value=10.0),
                   dbc.Button("Download Figure", id="download", color="primary", n_clicks=0)]),
         dcc.Graph(id="cl-pt-graph", mathjax=True),
@@ -73,12 +75,22 @@ def plot_norm(
     if particle != "electrons":
         glob_pt_norm = cl_helpers.get_global_pt(init_files[particle], eta_range, pt_cut, pileup_key)
     else:
-        glob_pt_norm = cl_helpers.get_global_pt(init_files[particle], eta_range, pt_cut, pileup_key, mode="mode")
+        #glob_pt_norm = cl_helpers.get_global_pt(init_files[particle], eta_range, pt_cut, pileup_key, mode="mode")
+        glob_pt_norm = cl_helpers.get_peak(init_files[particle], eta_range, pt_cut, pileup_key)
 
     fig = go.Figure()
 
-    plot_title = r"{} $p_T$ Response".format(particle.capitalize()[:-1])
-    plot_path = "plots/png/pT_response_{}_eta_{}_{}_ptGtr_{}_{}_annotatedAdjust.png".format(pileup_key, str(eta_range[0]).replace(".","p"), str(eta_range[1]).replace(".","p"), str(pt_cut).replace(".","p"), particle)
+    if particle == "photons":
+        part_sym = "$\gamma$"
+    elif particle == "electrons":
+        part_sym = "$e$"
+    elif particle == "pions":
+        part_sym = "$\pi$"
+
+    #plot_title = r"${} p_T$ Response".format(particle.capitalize()[:-1])
+    #plot_title = r"${} \: p_T$ Response \: (PU200, {}\: Gev)".format(part_sym, "${p_T}^{Gen} > 50 $")
+    plot_title = r"{} Response (PU200, {} GeV)".format(part_sym, "${p_T}^{Gen} > 50$")
+    plot_path = "plots/png/pT_response_{}_eta_{}_{}_ptGtr_{}_{}_goodTitle.png".format(pileup_key, str(eta_range[0]).replace(".","p"), str(eta_range[1]).replace(".","p"), str(pt_cut).replace(".","p"), particle)
     
     y_axis_title = r"$\huge{<\frac{{p_T}^{Cl}}{{p_T}^{Gen}}>}$" if particle != "electrons" else r"$\huge{mode(\frac{{p_T}^{Cl}}{{p_T}^{Gen}})}$"
     x_axis_title = "Radius (Coeff)"
@@ -94,14 +106,26 @@ def plot_norm(
         else:
             color = "green"
 
-        info = {"plot_type": "scatter",
-                             "x_data": np.arange(0.0, 0.05, 0.001),
-                             "y_data": glob_pt_norm[key],
-                             "x_title": x_axis_title,
-                             "y_title": y_axis_title,
-                             "color": color}
+        info = {"plot_type": "plot",
+                            "x_data": np.arange(0.001, 0.05, 0.001),
+                            "y_data": glob_pt_norm[key][1:],
+                            "x_title": x_axis_title,
+                            "y_title": y_axis_title,
+                            "color": color,
+                            "linestyle": "solid"}
         
         plot_args["traces"]["111"][key] = info
+
+        '''if key == "original":
+            info = {"plot_type": "plot",
+                                "x_data": np.arange(0.0, 0.05, 0.001),
+                                "y_data": glob_pt_norm[key],
+                                "x_title": x_axis_title,
+                                "y_title": y_axis_title,
+                                "color": color,
+                                "linestyle": "solid"}
+            
+            plot_args["traces"]["111"][key] = info'''
 
         fig.add_trace(
             go.Scatter(
@@ -112,9 +136,6 @@ def plot_norm(
         )
 
     plot_args["hline"] = {"val": 1.0, "color": "black", "linestyle": "--"}
-    plot_args["eta_text"] = r"${} < \eta < {}$".format(eta_range[0], eta_range[1])
-    pt_text = r"${p_T}^{Gen} > $" + r"${}$".format(pt_cut)
-    plot_args["pt_text"] = pt_text
     
     cms_plot = cl_plot_funcs.cmsPlot(plot_title, plot_path, **plot_args)
 

@@ -15,8 +15,9 @@ import yaml
 
 from bye_splits.utils import common, params
 
-import matplotlib.pyplot as plt
-import mplhep as hep
+#import matplotlib.pyplot as plt
+#import mplhep as hep
+from scipy.optimize import curve_fit, Bounds
 
 annot_str = lambda x: str(x).replace(".", "p")
 
@@ -242,8 +243,6 @@ def get_global_pt(file, eta_range, pt_cut, pileup, mode="mean"):
         for radius in dfs.keys():
             df_o, df_w = dfs[radius]["original"], dfs[radius]["weighted"]
             df_o, df_w = filter_dfs(df_o, eta_range, pt_cut), filter_dfs(df_w, eta_range, pt_cut)
-            '''df_o = df_o[ (df_o.eta > eta_range[0]) & (df_o.eta < eta_range[1]) & (df_o.gen_pt > pt_cut) ]
-            df_w = df_w[ (df_w.eta > eta_range[0]) & (df_w.eta < eta_range[1]) & (df_w.gen_pt > pt_cut) ]'''
             if mode=="mean":
                 mean_original = df_o["pt_norm"].mean()
             else:
@@ -265,6 +264,52 @@ def get_global_pt(file, eta_range, pt_cut, pileup, mode="mean"):
             pt_mean.update({"eta": eta})
     
     return pt_mean
+
+def gaus(x, mean, std):
+    return pow(std*np.sqrt(2*np.pi), -1)*np.exp(-pow((x-mean)/std,2)/2)
+
+def get_gaus_mean(df_filt, col):
+    split = df_filt[col].mean() - effrms(df_filt[col].to_frame().rename({0: "pt_norm"}))
+
+    peak = df_filt[ df_filt[col] > split ]
+
+    peak_vals = np.array(peak[col])
+
+    bins = np.linspace(peak_vals.min(), peak_vals.max(), 100)
+    counts, bin_edges = np.histogram(peak_vals, bins=bins, density=True)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+    mean_0, sig_0 = bin_centers.mean(), bin_centers.std()
+    p0 = np.array([mean_0, sig_0])
+
+    lower_bounds = 0.01*p0
+    upper_bounds = 100*p0
+    bounds = Bounds(lower_bounds, upper_bounds)
+
+    params, _ = curve_fit(gaus, bin_centers, counts, p0=p0, bounds=bounds)
+    mean, _ = params
+
+    return mean
+
+def get_peak(file, eta_range, pt_cut, pileup):
+    cols = ["pt_norm"] if pileup == "PU0" else ["pt_norm", "pt_norm_eta_corr"]
+    original, weighted, eta = [0.0], [0.0], [0.0]
+    with pd.HDFStore(file, mode="r") as dfs:
+        for radius in dfs.keys():
+            df_o, df_w = dfs[radius]["original"], dfs[radius]["weighted"]
+            df_o, df_w = filter_dfs(df_o, eta_range, pt_cut), filter_dfs(df_w, eta_range, pt_cut)
+            
+            peak_o = get_gaus_mean(df_o, "pt_norm")
+            original.append(peak_o)
+            for col in cols:
+                peak_w = get_gaus_mean(df_w, col)
+                weighted.append(peak_w) if col=="pt_norm" else eta.append(peak_w)
+        pt_peak = {"original": original,
+                   "layer": weighted}
+        if len(eta) > 1:
+            pt_peak.update({"eta": eta})
+    
+    return pt_peak
 
 def get_dataframes(init_files, particles, coef, eta_range, pt_cut):
     df_o, df_w = get_dfs(init_files, coef, particles)
@@ -327,7 +372,7 @@ def get_binned_modes(df, bin_col, var_col, bins=50):
     #print(df)
     return df.groupby(bin_col).apply(lambda x: x[new_var].mean())
     
-def write_cms_plots(**kwargs):
+'''def write_cms_plots(**kwargs):
     hep.style.use("CMS")
     #hep.cms.text("Simulation",loc=1)
     plt.rcParams['text.usetex'] = True
@@ -376,5 +421,5 @@ def update_pileup_callback():
         if n_clicks%2==0:
             return "primary"
         else:
-            return "success"
+            return "success"'''
     
