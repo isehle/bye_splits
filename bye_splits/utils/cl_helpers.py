@@ -119,6 +119,7 @@ def effrms(data, c=0.68):
     containing a fraction 'c' of items in a 1D array.
     """
     if isinstance(data, pd.DataFrame):
+        print(data.keys())
         assert(len(data.keys())==1)
         key = list(data.keys())[0]
         sorted = data.sort_values(by=key)
@@ -191,6 +192,23 @@ def read_weights(dir, cfg, version="final", mode="weights"):
     weights_by_particle["electrons"] = weights_by_particle["photons"]
     
     return weights_by_particle
+
+def read_pu_weights(cfg):
+    dirs = cfg["clusterStudies"]["optimization"]["PU200"]["weights"]
+    weights_by_particle = {}
+    for particle in dirs.keys():
+        weights_by_radius = {}
+        with pd.HDFStore(dirs[particle], "r") as etaWeights:
+            for radius in etaWeights.keys():
+                radius_float = float(radius.replace("/coef_","").replace("p","."))
+                intercept, slope = etaWeights[radius].intercept_.iloc[0], etaWeights[radius].coef_.iloc[0]
+                weights_by_radius[radius_float] = {"slope": slope,
+                                                   "intercept": intercept}
+            weights_by_particle[particle] = weights_by_radius
+    weights_by_particle["electrons"] = weights_by_particle["photons"]  
+
+    return weights_by_particle             
+
 
 def fill_filename(filename, weight, pileup, eta_corr=0):
     """Takes a base <filename> and three ints which correspond

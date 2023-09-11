@@ -94,8 +94,8 @@ class cmsPlot:
                     plt.stairs(counts, bins, label=label, color = info["color"])
                     plt.yscale("log")
 
-                    mean_val, color, linestyle = info["vline"].values()
-                    ax.axvline(x=mean_val, color=color, linestyle=linestyle)
+                    '''mean_val, color, linestyle = info["vline"].values()
+                    ax.axvline(x=mean_val, color=color, linestyle=linestyle)'''
                     
                     for line in info["vlines"]:
                         mean_val, color, linestyle = line.values()

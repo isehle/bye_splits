@@ -277,7 +277,7 @@ def layer_weights(pars, cfg):
 def eta_correction(df_pu):
     X = df_pu[["eta"]]
     y = df_pu.gen_pt - df_pu.pt
-    corr = LinearRegression().fit(X, y)
+    corr = LinearRegression(fit_intercept=False).fit(X, y)
     return corr
 
 def apply_eta_corr(df_pu, corr):
@@ -315,7 +315,6 @@ def eta_corr_per_rad(clFile, etaFile, radius, eta_corr = None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--particles", choices=("photons", "electrons", "pions"), required=True)
-    #parser.add_argument("--radius", help="clustering radius to use: (0.0, 0.05]", required=True, type=float)
     parser.add_argument("--radius", help="clustering radius to use: (0.0, 0.05]", type=float)
     parser.add_argument("--pileup", help="tag for PU200 vs PU0", action="store_true")
     parser.add_argument("--etaCal", help="path to eta-calibration file", type=str)
@@ -333,20 +332,11 @@ if __name__ == "__main__":
         out_dir = "{}/{}/{}/optimization/official/final/".format(cfg["clusterStudies"]["localDir"], pileup_dir, pars.particles)
         os.makedirs(out_dir, exist_ok=True)
 
-        file_layer_weights = "{}/{}_bc_stc_r{}.hdf5".format(out_dir, cfg["clusterStudies"]["optimization"]["baseName"], radius_str)
-
-        '''if pars.particles == "pions":
-            phot_dir = "{}/PU0/photons/optimization/official/final/".format(cfg["clusterStudies"]["localDir"])
-            phot_name = "{}/{}_r{}.hdf5".format(phot_dir, "optimization_final", radius_str)
-            with pd.HDFStore(phot_name,"r") as photWeights:
-                phot_weights = photWeights["weights"]
-
-            cfg["phot_weights"] = phot_weights'''
+        file_layer_weights = "{}/{}.hdf5".format(out_dir, cfg["clusterStudies"]["optimization"]["baseName"])
         
         if not os.path.exists(file_layer_weights):
             weights = layer_weights(pars, cfg)
             with pd.HDFStore(file_layer_weights, mode="w") as outOpt:
-                #outOpt["weights"] = pd.concat([phot_weights, weights]) if pars.particles=="pions" else weights
                 outOpt["weights"] = weights
         else:
             print("\n{} already exists, skipping\n.".format(file_layer_weights))
@@ -359,10 +349,12 @@ if __name__ == "__main__":
         #cl_file = "data/new_algos/PU200/electrons/cluster_size_negEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5"
         #cl_file = "data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/posEta/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5"
         #cl_file = "data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5"
-        cl_file = "data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/negEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5"
+        #cl_file = "data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/negEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5"
+        cl_file = "data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_lessCols.hdf5"
 
         if pars.etaCal == None:
-            eta_file = os.path.dirname(cl_file) + "/etaCorr_fromCenter_new.hdf5"
+            #eta_file = os.path.dirname(cl_file) + "/etaCorr_fromCenter_new.hdf5"
+            eta_file = os.path.dirname(cl_file) + "/etaCorr_noIntercept.hdf5"
             print("\nWriting: ", eta_file)
             with pd.HDFStore(cl_file, "a") as clFile:
                 if pars.radius != None:

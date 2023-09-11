@@ -101,7 +101,7 @@ layout = dbc.Container(
         html.Label("Coef:"),
         dcc.Slider(id="coef", min=0.0, max=0.05, value=0.01, marks=marks),
         #html.Label("PT Cut: "),
-        #dcc.RangeSlider(id="pt_range", min=0, max=100, step=5, value=[10, 100]),
+        dcc.RangeSlider(id="pt_range", min=10, max=200, step=10, value=[10, 200]),
         html.Label("EtaRange:"),
         dcc.RangeSlider(id="eta_range", min=1.7, max=2.9, step=0.1, value=[1.7, 2.7]),
         html.Label("Distribution Range (Eff_RMS):"),
@@ -151,7 +151,7 @@ def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
     diff_means = {}
 
     dist_args = {"traces": {"111": {}}}
-    dist_args["vline"] = {"val": 1.0, "color": "black", "linestyle": "--"}
+    #dist_args["vline"] = {"val": 1.0, "color": "black", "linestyle": "--"}
     for key in dists.keys():
         df = dists[key]
         if key == "original":
@@ -191,51 +191,26 @@ def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
             x_title = r"$\frac{{p_T}^{Cl}}{{p_T}^{Gen}}$"
             y_title = r"$Events$"
 
+            vlines = ({"val": lower_res, "color": "black", "linestyle": "--"},
+                      {"val": upper_res, "color": "black", "linestyle": "--"},
+                      {"val": lower_eff, "color": "red", "linestyle": "--"},
+                      {"val": upper_eff, "color": "red", "linestyle": "--"})
+
             if name == "Original":
                 plot_info = {"plot_type": "hist",
-                            #"data": display_vals[col_name],
-                            "data": display_vals.gen_pt,
+                            "data": display_vals[col_name],
                             "bins": 1000 if particle != "pions" else 100,
                             "label": name,
-                            "x_title": r"${p_T}^{Gen}$",
+                            "x_title": x_title,
                             "y_title": y_title,
                             "color": color,
-                            #"vline": {"val": np.mean(display_vals[col_name]), "color": color, "linestyle": "--"}
+                            #"vline": {"val": np.mean(display_vals[col_name]), "color": color, "linestyle": "--"},
+                            "vlines": vlines
                             }
-            
-            '''if particle == "pions":
-                x_data = (display_vals.gen_pt - display_vals.pt)/display_vals.gen_pt if col_name != "pt_norm_eta_corr" else (display_vals.gen_pt- display_vals.pt_corr_eta)/display_vals.gen_pt
-                diff_means[name] = x_data.mean()
-                plot_info["data"] = x_data
-                plot_info["x_title"] = r"${p_T}^{Cl} - {p_T}^{Gen}$"
-                fig.add_trace(
-                    go.Histogram(
-                        x = x_data,
-                        nbinsx=1000 if particle != "pions" else 100,
-                        autobinx=False,
-                        name = name + "_diff",
-                        histnorm="probability density",
-                        marker_color=color
-                    ),
-                    row=1,
-                    col=1
-                )
-            else:
-                fig.add_trace(go.Histogram(
-                                    x = display_vals[col_name],
-                                    nbinsx=1000 if particle != "pions" else 100,
-                                    autobinx=False,
-                                    name=name,
-                                    histnorm="probability density",
-                                    marker_color=color,
-                                ),
-                                row=1,
-                                col=1
-                )'''
 
             fig.add_trace(go.Histogram(
-                                #x = display_vals[col_name],
-                                x = display_vals.gen_pt,
+                                x = display_vals[col_name],
+                                #x = display_vals.gen_pt,
                                 nbinsx=1000 if particle != "pions" else 100,
                                 autobinx=False,
                                 name=name,
@@ -373,7 +348,7 @@ def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
                                                 "x_data": np.arange(0.001, 0.05, 0.001),
                                                 "y_data": rms,
                                                 "x_title": r"$r$",
-                                                "y_title": r"$\sigma \: ({\sigma}_{Eff})$",
+                                                "y_title": r"${\sigma \: ({\sigma}_{Eff})}/{\langle {p_T}^{Norm} \rangle}$",
                                                 "color": color,
                                                 "linestyle": "solid",
                                                 "yscale": "log"}
@@ -382,7 +357,7 @@ def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
                                                     "x_data": np.arange(0.001, 0.05, 0.001),
                                                     "y_data": eff,
                                                     "x_title": r"$r$",
-                                                    "y_title": r"$\sigma \: ({\sigma}_{Eff})$",
+                                                    "y_title": r"${\sigma \: ({\sigma}_{Eff})}/{\langle {p_T}^{Norm} \rangle}$",
                                                     "color": color,
                                                     "linestyle": "dashed",
                                                     "yscale": "log"}
@@ -416,25 +391,29 @@ def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
     if download > 0:
 
         if particle == "photons":
-            part_sym = "$\gamma$"
+            part_sym = "\gamma"
         elif particle == "electrons":
-            part_sym = "$e$"
+            part_sym = "e"
         elif particle == "pions":
-            part_sym = "$\pi$"
+            part_sym = "\pi"
 
         #hist_title = r"${} \: $".format(part_sym) + r"${{p_T}^{Cl}}/{{p_T}^{Gen}} \: Distribution \: $" + r"$({})$".format(pileup_key)
         #hist_path = "plots/png/pTNormDist_{}_eta_{}_{}_ptGtr_{}_log_{}_17juillet_bc_stc.png".format(pileup_key, cl_helpers.annot_str(eta_range[0]), cl_helpers.annot_str(eta_range[1]), pt_cut, particle)
 
-        hist_title = r"${} \: $".format(part_sym) + r"${p_T}^{Gen} \: Distribution \: $" + r"$({})$".format(pileup_key)
-        hist_path = "plots/png/pTGenDist_{}_eta_{}_{}_ptGtr_{}_log_{}_17juillet_bc_stc_18juillet.png".format(pileup_key, cl_helpers.annot_str(eta_range[0]), cl_helpers.annot_str(eta_range[1]), pt_cut, particle)
+        #hist_title = r"${} \: $".format(part_sym) + r"${p_T}^{Gen} \: Distribution \: $" + r"$({})$".format(pileup_key)
+        #hist_path = "plots/png/pTGenDist_{}_eta_{}_{}_ptGtr_{}_log_{}_17juillet_bc_stc_18juillet.png".format(pileup_key, cl_helpers.annot_str(eta_range[0]), cl_helpers.annot_str(eta_range[1]), pt_cut, particle)
+
+        hist_title = r"${} \: {} \: Distribution \: ({}, r={})$".format(part_sym, "{p_T}^{Norm}", pileup_key, coef)
+        hist_path = "plots/png/pTNormDist_{}_eta_{}_{}_ptGtr_{}_log_{}_bc_stc_radius{}.png".format(pileup_key, cl_helpers.annot_str(eta_range[0]), cl_helpers.annot_str(eta_range[1]), pt_cut, particle, str(coef).replace(".","p"))
 
         hist_cms = cl_plot_funcs.cmsPlot(hist_title, hist_path, **dist_args)
 
         #hist_cms.write_fig()
 
         #res_title = r"${} \: $".format(part_sym) + r"$Resolution \: vs. \: r^{Cl}$" + r"$({})$".format(pileup_key)
-        res_title = r"{} Res vs. {}, ({}, {} GeV)".format(part_sym, "$r^{Cl}$", pileup_key, "${p_T}^{Gen} > 50$")
-        res_path = "plots/png/res_vs_radius_{}_eta_{}_{}_ptGtr_{}_{}_17juillet_bc_stc_highPT_goodTitle.png".format(pileup_key, cl_helpers.annot_str(eta_range[0]), cl_helpers.annot_str(eta_range[1]), pt_cut, particle)
+        #res_title = r"{} Res vs. {}, ({}, {} GeV)".format(part_sym, "$r^{Cl}$", pileup_key, "${p_T}^{Gen} > 50$")
+        res_title = r"${}$ Res vs. ".format(part_sym) + r"$r^{Cl}$, (" + r"{}, ".format(pileup_key) + r"${p_T}^{Gen} > 50 GeV)$"
+        res_path = "plots/png/res_vs_radius_{}_eta_{}_{}_ptGtr_{}_{}_bc_stc_highPT_correctAxis.png".format(pileup_key, cl_helpers.annot_str(eta_range[0]), cl_helpers.annot_str(eta_range[1]), pt_cut, particle)
 
         res_cms = cl_plot_funcs.cmsPlot(res_title, res_path, **res_args)
 

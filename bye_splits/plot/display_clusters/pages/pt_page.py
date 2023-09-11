@@ -89,10 +89,10 @@ def plot_norm(
 
     #plot_title = r"${} p_T$ Response".format(particle.capitalize()[:-1])
     #plot_title = r"${} \: p_T$ Response \: (PU200, {}\: Gev)".format(part_sym, "${p_T}^{Gen} > 50 $")
-    plot_title = r"{} Response (PU200, {} GeV)".format(part_sym, "${p_T}^{Gen} > 50$")
-    plot_path = "plots/png/pT_response_{}_eta_{}_{}_ptGtr_{}_{}_goodTitle.png".format(pileup_key, str(eta_range[0]).replace(".","p"), str(eta_range[1]).replace(".","p"), str(pt_cut).replace(".","p"), particle)
+    plot_title = r"{} Response (PU200, {} GeV)".format(part_sym, "${p_T}^{Gen} > 10$")
+    plot_path = "plots/png/pT_response_{}_eta_{}_{}_ptGtr_{}_{}_grid_zeroInterceptWeights.png".format(pileup_key, str(eta_range[0]).replace(".","p"), str(eta_range[1]).replace(".","p"), str(pt_cut).replace(".","p"), particle)
     
-    y_axis_title = r"$\huge{<\frac{{p_T}^{Cl}}{{p_T}^{Gen}}>}$" if particle != "electrons" else r"$\huge{mode(\frac{{p_T}^{Cl}}{{p_T}^{Gen}})}$"
+    y_axis_title = r"$\huge{\langle \frac{{p_T}^{Cl}}{{p_T}^{Gen}} \rangle}$" if particle != "electrons" else r"$\huge{mode(\frac{{p_T}^{Cl}}{{p_T}^{Gen}})}$"
     x_axis_title = "Radius (Coeff)"
 
     plot_args = {"traces": {"111": {}}}

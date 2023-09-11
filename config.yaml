@@ -151,13 +151,14 @@ clusterStudies:
   localDir: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/
   ehleDir: /eos/user/i/iehle/
   dataFolder: data/
-  pileup: True
-  reprocess: True # {True: Process the ROOT file, False: read the .parquet if already processed}
-  parquetTag: fullEta_17juillet
+  pileup: False
+  reprocess: False # {True: Process the ROOT file, False: read the .parquet if already processed}
+  parquetTag: fullEta
   #clusterSizeBaseName: cluster_size_weighted_selectOneEffRms_maxSeed
   #clusterSizeBaseName: cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth
   #clusterSizeBaseName: cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_bc_stc
-  clusterSizeBaseName: cluster_size_dRbyLayer_nanZeroes
+  #clusterSizeBaseName: cluster_size_dRbyLayer_nanZeroes
+  clusterSizeBaseName: cluster_size_funRadiiTest
   coeffs: [0.0, 0.05, 50]
   nevents: -1
   tree: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple/HGCalTriggerNtuple
@@ -206,7 +207,7 @@ clusterStudies:
       #electrons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/weighted/final/selectOnestd/maxSeed/cluster_size_weighted_selectOneStd_adjustMaxWeight_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5
       #electrons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/weighted/final/selectOnestd/maxSeed/photWeights/cluster_size_photWeighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5
       #electrons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/weighted/final/selectOnestd/maxSeed/fullEta/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
-      electrons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/weighted/final/selectOnestd/maxSeed/fullEta/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
+      #electrons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/weighted/final/selectOnestd/maxSeed/fullEta/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
       #pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/weighted/final/bound5/selectOneStd/maxSeed/cluster_size_weighted_selectOneStd_bound5_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5
       #pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/weighted/final/bound5/selectOneStd/maxSeed/fullEta/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
       #pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/weighted/final/bound5/selectOneStd/maxSeed/fullEta/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
@@ -222,7 +223,8 @@ clusterStudies:
       #electrons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/electrons/cluster/weighted/selectOneStd/maxSeed/fullEta/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
       #pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/cluster_size_weighted_selectOneStd_bound5_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5
       #pions: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
-      pions: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
+      #pions: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
+      pions: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_lessCols.hdf5
       #pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/fullEta/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
   optimization:
     PU0:
@@ -234,6 +236,11 @@ clusterStudies:
       electrons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/electrons/cluster/weighted/selectOneStd/maxSeed/negEta/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5
       #pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/posEta/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20.hdf5
       pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/negEta/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5
+      weights:
+        photons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/photons/cluster/weighted/selectOneStd/maxSeed/posEta/smooth/etaCorr.hdf5
+        #pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/posEta/smooth/etaCorr_new.hdf5
+        #pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/etaCorr_fullDist.hdf5
+        pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/etaCorr_noIntercept.hdf5
     baseName: optimization_selectOneEffRms_maxSeed
     pt_cut: 5
     cl_pt_cut: 3
