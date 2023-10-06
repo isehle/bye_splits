@@ -1,3 +1,7 @@
+# pyright: reportUnboundVariable=false
+# pyright: reportGeneralTypeIssues=false
+# pyright: reportInvalidStringEscapeSequence=false
+
 import os
 import sys
 
@@ -27,22 +31,7 @@ parser = argparse.ArgumentParser(description="")
 parsing.add_parameters(parser)
 FLAGS = parser.parse_args()
 
-cfg = cl_helpers.read_cl_size_params()
-
-if cfg["local"]:
-    data_dir = cfg["localDir"]
-else:
-    data_dir = params.EOSStorage(FLAGS.user, "data/")
-
-input_files = cfg["dashApp"]
-
-'''def get_dataframes(init_files, particles, coef, eta_range, pt_cut):
-    df_o, df_w = cl_helpers.get_dfs(init_files, coef, particles)
-    pt_cut = float(pt_cut) if pt_cut!="PT Cut" else 0
-    df_o, df_w = cl_helpers.filter_dfs(df_o, eta_range, pt_cut), cl_helpers.filter_dfs(df_w, eta_range, pt_cut)
-
-    return df_o, df_w'''
-
+cluster_data = cl_helpers.clusterData()
 
 # Dash page setup
 ##############################################################################################################################
@@ -134,13 +123,14 @@ def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
     global glob_res
     pileup_key = "PU0" if pileup%2==0 else "PU200"
 
-    init_files = input_files[pileup_key]
+    df_original, df_weighted = cluster_data.get_dataframes(pileup_key, particle, coef, eta_range, pt_cut)
 
-    df_original, df_weighted = cl_helpers.get_dataframes(init_files, particle, coef, eta_range, pt_cut)
-    #df_original, df_weighted = cl_helpers.get_dataframes(init_files, particle, coef, eta_range, pt_range)
-
-    weighted_cols = {"PU0": ["pt_norm"],
-                     "PU200": ["pt_norm", "pt_norm_eta_corr"]}
+    if particle != "pions":
+        weighted_cols = {"PU0": ["pt_norm"],
+                        "PU200": ["pt_norm", "pt_norm_eta_corr"]}
+    else:
+        weighted_cols = {"PU0": ["pt_norm", "pt_norm_en_corrected"],
+                         "PU200": ["pt_norm", "pt_norm_en_corrected", "pt_norm_eta_corrected"]}
     
     dists = {"original": df_original,
              "weighted": df_weighted}
@@ -160,12 +150,36 @@ def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
             col_names = weighted_cols[pileup_key]
 
         for col_name in col_names:
-            if key != "original":
-                name = "Layer Weights" if col_name == "pt_norm" else "Eta Correction"
+            '''if key != "original":
+                calib_name = "Eta Correction" if particle != "pions" else "Energy and Eta Correction"
+
+                name = "Layer Weights" if col_name == "pt_norm" else calib_name
                 color = "red" if col_name == "pt_norm" else "green"
             else:
                 name = "Original"
+                color = "blue"'''
+            
+            if key == "original":
                 color = "blue"
+                name = key.capitalize()
+            else:
+                if col_name == "pt_norm":
+                    color = "red"
+                    name = "Layer Weighted"
+                elif col_name == "pt_norm_eta_corrected":
+                    color = "green"
+                    name = "Eta Corrected"
+                elif col_name == "pt_norm_en_corrected":
+                    color = "purple"
+                    name = "Energy Corrected"
+            '''elif key == "energy":
+                color = "purple"
+                name = key.capitalize() + " Corrected"
+            else:
+                color = "green"
+                name = key.capitalize() + " Corrected"'''
+
+            print(name)
 
             upper_res = df[col_name].mean() + sig_range[1]*df[col_name].std()
             lower_res = df[col_name].mean() + sig_range[0]*df[col_name].std()
@@ -191,22 +205,15 @@ def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
             x_title = r"$\frac{{p_T}^{Cl}}{{p_T}^{Gen}}$"
             y_title = r"$Events$"
 
-            vlines = ({"val": lower_res, "color": "black", "linestyle": "--"},
-                      {"val": upper_res, "color": "black", "linestyle": "--"},
-                      {"val": lower_eff, "color": "red", "linestyle": "--"},
-                      {"val": upper_eff, "color": "red", "linestyle": "--"})
-
-            if name == "Original":
-                plot_info = {"plot_type": "hist",
-                            "data": display_vals[col_name],
-                            "bins": 1000 if particle != "pions" else 100,
-                            "label": name,
-                            "x_title": x_title,
-                            "y_title": y_title,
-                            "color": color,
-                            #"vline": {"val": np.mean(display_vals[col_name]), "color": color, "linestyle": "--"},
-                            "vlines": vlines
-                            }
+            plot_info = {"plot_type": "hist",
+                                        "data": display_vals[col_name],
+                                        "bins": 1000 if particle != "pions" else 100,
+                                        "label": name,
+                                        "x_title": x_title,
+                                        "y_title": y_title,
+                                        "color": color,
+                                        "vline": {"val": np.mean(display_vals[col_name]), "color": color, "linestyle": "--"},
+                                        }
 
             fig.add_trace(go.Histogram(
                                 x = display_vals[col_name],
@@ -221,9 +228,7 @@ def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
                             col=1
             )
 
-            if name == "Original":
-                dist_args["traces"]["111"][name] = plot_info
-
+            dist_args["traces"]["111"][name] = plot_info
 
             if particle == "electrons":
                 ####################################################################################################
@@ -257,53 +262,28 @@ def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
                 )
                 ####################################################################################################
 
-                '''bins = np.linspace(display_vals[col_name].min(), display_vals[col_name].max(), 1000)
-                counts, bin_edges = np.histogram(display_vals[col_name], bins=bins, density=True)
-                
-                bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2'''
-                
-                '''alpha_0 = 0.8 if name == "Original" else 0.9
-                #alpha_0, n_0, mean_0, std_0  = bin_centers.mean(), 10, bin_centers[counts.argmax()], bin_centers.std()
-                n_0, mean_0, std_0  = 10, bin_centers[counts.argmax()], 0.1
-                p0 = np.array([alpha_0, n_0, mean_0, std_0])
 
-                lower_bounds, upper_bounds = 0.1*p0, 10*p0
-                bounds = Bounds(lower_bounds, upper_bounds)
-
-                params, _ = curve_fit(cl_plot_funcs.crystal_ball, bin_centers, counts, p0=p0, bounds=bounds)
-                fit_alpha, fit_n, fit_mean, fit_std = params
-
-                pdf_values = cl_plot_funcs.crystal_ball(bin_centers, fit_alpha, fit_n, fit_mean, fit_std)'''
-
-                '''params = crystalball.fit(counts, loc=bin_centers[counts.argmax()], scale=bin_centers.std())
-                pdf_values = crystalball.pdf(bin_centers, *params)
-
-                print("\nParams: ", params)
-                print("=="*100)
-                print("\nCounts: ", counts)
-                print("=="*100)
-                print("\nPDF: ", )   
-
-                fig.add_trace(
-                    go.Scatter(
-                        x = bin_centers,
-                        y = pdf_values,
-                        line = dict(color=color),
-                        name = name+" Crystal Ball"                    
-                    )
-                )'''
-
-    fig.add_vline(x=1.0, row=1, col=1, line_dash="dashdot", line_color="black")
+    '''fig.add_vline(x=1.0, row=1, col=1, line_dash="dashdot", line_color="black")
 
     fig.add_vline(x=vals["Original Displayed"]["Mean"], row=1, col=1, line_dash="dash", line_color="blue")
     fig.add_vline(x=vals["Layer Weights Displayed"]["Mean"], row=1, col=1, line_dash="dash", line_color="red")
+    
     if pileup_key=="PU200":
-        fig.add_vline(x=vals["Eta Correction Displayed"]["Mean"], row=1, col=1, line_dash="dash", line_color="green")
+        if particle != "pions":
+            fig.add_vline(x=vals["Eta Correction Displayed"]["Mean"], row=1, col=1, line_dash="dash", line_color="green")
+        else:
+            fig.add_vline(x=vals["Energy and Eta Correction Displayed"]["Mean"], row=1, col=1, line_dash="dash", line_color="green")'''
 
-    '''fig.add_vline(x=diff_means["Original"], row=1, col=1, line_dash="dash", line_color="blue")
-    fig.add_vline(x=diff_means["Layer Weights"], row=1, col=1, line_dash="dash", line_color="red")
+    fig.add_vline(x=vals["Original Displayed"]["Mean"], row=1, col=1, line_dash="dash", line_color="blue")
+    fig.add_vline(x=vals["Layer Weighted Displayed"]["Mean"], row=1, col=1, line_dash="dash", line_color="red")
+    
     if pileup_key=="PU200":
-        fig.add_vline(x=diff_means["Eta Correction"], row=1, col=1, line_dash="dash", line_color="green")'''
+        if particle != "pions":
+            fig.add_vline(x=vals["Eta Corrected Displayed"]["Mean"], row=1, col=1, line_dash="dash", line_color="green")
+        else:
+            fig.add_vline(x=vals["Energy Corrected Displayed"]["Mean"], row=1, col=1, line_dash="dash", line_color="green")
+            fig.add_vline(x=vals["Eta Corrected Displayed"]["Mean"], row=1, col=1, line_dash="dash", line_color="green")
+
     
     stat_df = pd.DataFrame(vals).reset_index()
     stat_df = stat_df.rename(columns={"index": ""})
@@ -334,11 +314,13 @@ def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
     fig.update_traces(opacity=0.5, row=1, col=1)
 
     if ctx.triggered_id != "coef":
-        glob_res = cl_helpers.get_global_res(init_files[particle], eta_range, pt_cut, pileup_key)
-        #glob_res = cl_helpers.get_global_res(init_files[particle], eta_range, pt_range, pileup_key)
+        glob_res = cluster_data.get_global_res(particle, eta_range, pt_cut, pileup_key)
 
     res_args = {"traces": {"111": {}}}
-    colors = ("blue", "red") if pileup_key == "PU0" else ("blue", "red", "green")
+    if particle != "pions":
+        colors = ("blue", "red") if pileup_key == "PU0" else ("blue", "red", "green")
+    else:
+        colors = ("blue", "red", "purple") if pileup_key == "PU0" else ("blue", "red", "purple", "green")
     for key, color in zip(glob_res.keys(), colors):
         rms, eff = glob_res[key].values()
 
@@ -404,16 +386,16 @@ def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
         #hist_path = "plots/png/pTGenDist_{}_eta_{}_{}_ptGtr_{}_log_{}_17juillet_bc_stc_18juillet.png".format(pileup_key, cl_helpers.annot_str(eta_range[0]), cl_helpers.annot_str(eta_range[1]), pt_cut, particle)
 
         hist_title = r"${} \: {} \: Distribution \: ({}, r={})$".format(part_sym, "{p_T}^{Norm}", pileup_key, coef)
-        hist_path = "plots/png/pTNormDist_{}_eta_{}_{}_ptGtr_{}_log_{}_bc_stc_radius{}.png".format(pileup_key, cl_helpers.annot_str(eta_range[0]), cl_helpers.annot_str(eta_range[1]), pt_cut, particle, str(coef).replace(".","p"))
+        hist_path = "plots/png/pTNormDist_{}_eta_{}_{}_ptGtr_{}_log_{}_bc_stc_radius{}_enEtaCalib_separate_byNorm.png".format(pileup_key, cl_helpers.annot_str(eta_range[0]), cl_helpers.annot_str(eta_range[1]), pt_cut, particle, str(coef).replace(".","p"))
 
         hist_cms = cl_plot_funcs.cmsPlot(hist_title, hist_path, **dist_args)
 
-        #hist_cms.write_fig()
+        hist_cms.write_fig()
 
         #res_title = r"${} \: $".format(part_sym) + r"$Resolution \: vs. \: r^{Cl}$" + r"$({})$".format(pileup_key)
         #res_title = r"{} Res vs. {}, ({}, {} GeV)".format(part_sym, "$r^{Cl}$", pileup_key, "${p_T}^{Gen} > 50$")
-        res_title = r"${}$ Res vs. ".format(part_sym) + r"$r^{Cl}$, (" + r"{}, ".format(pileup_key) + r"${p_T}^{Gen} > 50 GeV)$"
-        res_path = "plots/png/res_vs_radius_{}_eta_{}_{}_ptGtr_{}_{}_bc_stc_highPT_correctAxis.png".format(pileup_key, cl_helpers.annot_str(eta_range[0]), cl_helpers.annot_str(eta_range[1]), pt_cut, particle)
+        res_title = r"${}$ Res vs. ".format(part_sym) + r"$r^{Cl}$, (" + r"{}, ".format(pileup_key) + r"${p_T}^{Gen} > 10 GeV)$"
+        res_path = "plots/png/res_vs_radius_{}_eta_{}_{}_ptGtr_{}_{}_bc_stc_enEtaCalib_separate_byNorm.png".format(pileup_key, cl_helpers.annot_str(eta_range[0]), cl_helpers.annot_str(eta_range[1]), pt_cut, particle)
 
         res_cms = cl_plot_funcs.cmsPlot(res_title, res_path, **res_args)
 

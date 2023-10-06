@@ -32,7 +32,8 @@ if cfg["local"]:
 else:
     data_dir = params.EOSStorage(FLAGS.user, cfg["dataFolder"])
 
-input_files = cfg["dashApp"]
+#input_files = cfg["dashApp"]
+input_files = cfg["dashApp"]["local"] if cfg["local"] else cfg["dashApp"]["EOS"]
 
 marks = {
     coef: {"label": format(coef, ".3f"), "style": {"transform": "rotate(-90deg)"}}

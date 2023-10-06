@@ -1,3 +1,6 @@
+# pyright: reportUnboundVariable=false
+# pyright: reportUnusedExpression=false
+
 import os
 import sys
 
@@ -94,12 +97,8 @@ class cmsPlot:
                     plt.stairs(counts, bins, label=label, color = info["color"])
                     plt.yscale("log")
 
-                    '''mean_val, color, linestyle = info["vline"].values()
-                    ax.axvline(x=mean_val, color=color, linestyle=linestyle)'''
-                    
-                    for line in info["vlines"]:
-                        mean_val, color, linestyle = line.values()
-                        ax.axvline(x=mean_val, color=color, linestyle=linestyle)
+                    mean_val, color, linestyle = info["vline"].values()
+                    ax.axvline(x=mean_val, color=color, linestyle=linestyle)
                 
                 elif info["plot_type"] == "violin":
                     ax.violin(info["data"], positions=info["layers"], showmeans=True, showmedians=True)

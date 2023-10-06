@@ -22,14 +22,17 @@ parser = argparse.ArgumentParser(description="")
 parsing.add_parameters(parser)
 FLAGS = parser.parse_args()
 
-cfg = cl_helpers.read_cl_size_params()
+cluster_data = cl_helpers.clusterData()
+
+'''cfg = cl_helpers.read_cl_size_params()
 
 if cfg["local"]:
     data_dir = cfg["localDir"]
 else:
     data_dir = params.EOSStorage(FLAGS.user, cfg["dataFolder"])
 
-input_files = cfg["dashApp"]
+#input_files = cfg["dashApp"]
+input_files = cfg["dashApp"]["local"] if cfg["local"] else cfg["dashApp"]["EOS"]'''
 
 dash.register_page(__name__, title="PT", name="PT")
 
@@ -70,13 +73,11 @@ def plot_norm(
 ):
     # even number of clicks --> PU0, odd --> PU200 (will reset with other callbacks otherwise)
     pileup_key = "PU0" if pileup%2==0 else "PU200"
-    init_files = input_files[pileup_key]
 
     if particle != "electrons":
-        glob_pt_norm = cl_helpers.get_global_pt(init_files[particle], eta_range, pt_cut, pileup_key)
+        glob_pt_norm = cluster_data.get_global_pt(particle, eta_range, pt_cut, pileup_key)
     else:
-        #glob_pt_norm = cl_helpers.get_global_pt(init_files[particle], eta_range, pt_cut, pileup_key, mode="mode")
-        glob_pt_norm = cl_helpers.get_peak(init_files[particle], eta_range, pt_cut, pileup_key)
+        glob_pt_norm = cluster_data.get_global_pt(particle, eta_range, pt_cut, pileup_key, "peak")
 
     fig = go.Figure()
 
@@ -90,7 +91,7 @@ def plot_norm(
     #plot_title = r"${} p_T$ Response".format(particle.capitalize()[:-1])
     #plot_title = r"${} \: p_T$ Response \: (PU200, {}\: Gev)".format(part_sym, "${p_T}^{Gen} > 50 $")
     plot_title = r"{} Response (PU200, {} GeV)".format(part_sym, "${p_T}^{Gen} > 10$")
-    plot_path = "plots/png/pT_response_{}_eta_{}_{}_ptGtr_{}_{}_grid_zeroInterceptWeights.png".format(pileup_key, str(eta_range[0]).replace(".","p"), str(eta_range[1]).replace(".","p"), str(pt_cut).replace(".","p"), particle)
+    plot_path = "plots/png/pT_response_{}_eta_{}_{}_ptGtr_{}_{}_grid_enEtaCalib_byNorm_separate.png".format(pileup_key, str(eta_range[0]).replace(".","p"), str(eta_range[1]).replace(".","p"), str(pt_cut).replace(".","p"), particle)
     
     y_axis_title = r"$\huge{\langle \frac{{p_T}^{Cl}}{{p_T}^{Gen}} \rangle}$" if particle != "electrons" else r"$\huge{mode(\frac{{p_T}^{Cl}}{{p_T}^{Gen}})}$"
     x_axis_title = "Radius (Coeff)"
@@ -101,31 +102,22 @@ def plot_norm(
         #info= ["scatter", np.arange(0.0, 0.05, 0.001), glob_pt_norm[key], x_axis_title, y_axis_title, None]
         if key == "original":
             color = "blue"
-        elif key == "layer":
+        elif key == "layer" or key == "weighted":
             color = "red"
+        elif key == "energy":
+            color = "purple"
         else:
             color = "green"
 
         info = {"plot_type": "plot",
                             "x_data": np.arange(0.001, 0.05, 0.001),
-                            "y_data": glob_pt_norm[key][1:],
+                            "y_data": glob_pt_norm[key],
                             "x_title": x_axis_title,
                             "y_title": y_axis_title,
                             "color": color,
                             "linestyle": "solid"}
         
         plot_args["traces"]["111"][key] = info
-
-        '''if key == "original":
-            info = {"plot_type": "plot",
-                                "x_data": np.arange(0.0, 0.05, 0.001),
-                                "y_data": glob_pt_norm[key],
-                                "x_title": x_axis_title,
-                                "y_title": y_axis_title,
-                                "color": color,
-                                "linestyle": "solid"}
-            
-            plot_args["traces"]["111"][key] = info'''
 
         fig.add_trace(
             go.Scatter(

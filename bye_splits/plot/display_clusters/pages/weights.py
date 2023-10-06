@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# pyright: reportGeneralTypeIssues=false
 
 import os
 import sys
@@ -71,14 +72,13 @@ def plot_weights(radius, mode, pt_range):
     weights_by_particle = cl_helpers.read_weights(opt_dir, cfg, mode=plot)
     eta_weights_by_particle = cl_helpers.read_pu_weights(cfg)
 
-    particle_files = cfg["clusterStudies"]["dashApp"]["PU200"]
+    particle_files = cfg["clusterStudies"]["dashApp"]["local"]["PU200"]
 
     eta = np.linspace(1.7, 2.7, 50)
 
     layer_fig = make_subplots(rows=2, cols=1, subplot_titles=("EM", "Hadronic")) if mode=="Weights" else make_subplots(rows=2, cols=2, specs=[[{}, {}],  [{"colspan": 2}, None]], subplot_titles=("Photons", "Electrons", "Pions", "N/A"))
     eta_fig = make_subplots(rows=1, cols=2, subplot_titles=("EM", "Hadronic"))
 
-    #for particle in particles:
     for particle in ("photons", "pions"):
         _, weighted_particle_dfs = cl_helpers.get_dataframes(particle_files, particle, radius, [1.7, 2.7], 10)
 
@@ -87,7 +87,7 @@ def plot_weights(radius, mode, pt_range):
         weighted_particle_dfs.sort_values("gen_eta", inplace=True)
         
         weighted_particle_dfs["gen_eta_bin"] = pd.cut(weighted_particle_dfs.gen_eta, bins=50, labels=False)
-        weighted_particle_dfs["pt_diff"] = weighted_particle_dfs.gen_pt - weighted_particle_dfs.pt
+        weighted_particle_dfs["pt_diff"] = weighted_particle_dfs.pt - weighted_particle_dfs.gen_pt
 
         pt_diff = np.asarray(weighted_particle_dfs.groupby("gen_eta_bin").apply(lambda x: x.pt_diff.mean()))
 
@@ -95,28 +95,18 @@ def plot_weights(radius, mode, pt_range):
 
         pu_weights = eta_weights_by_particle[particle][radius]
         slope, intercept = np.full(eta.shape, pu_weights["slope"]), np.full(eta.shape, pu_weights["intercept"])
-        pu_weight_vals = eta*slope + intercept
-
-        '''if particle == "pions":
-            weight_offset = np.full(pu_weight_vals.shape, pu_weight_vals[0])
-            pu_weight_vals -= weight_offset
-
-            diff_offset = np.full(pt_diff.shape, pt_diff[0])
-            pt_diff -= diff_offset'''
+        pu_weight_vals = -(eta*slope + intercept)
 
         mse = np.square(np.subtract(pt_diff, pu_weight_vals)).mean()
         rmse = np.sqrt(mse)
         rmse_norm = rmse/pt_diff.mean()
 
-        #weights = weights[ weights.index <= 28 ]
         if mode == "Weights":
             layer_fig.add_trace(
                 go.Scatter(
                 name=particle,
                 x=weights.index,
                 y=weights.weights,
-                #text=weights.weights,
-                #textposition="auto"
                 ),
                 row=1 if particle != "pions" else 2,
                 col=1
@@ -140,7 +130,7 @@ def plot_weights(radius, mode, pt_range):
                 col = 1 if particle != "pions" else 2
             )
             eta_fig.add_annotation(
-                text = "RMSE = "  + str(round(rmse_norm, 3)),
+                text = r"$RMSE/ \langle p_T^{diff} \rangle = $"  + r"{}".format(str(round(rmse_norm, 3))),
                 xref = "paper",
                 yref = "paper",
                 x = 0.25 if particle != "pions" else 0.9,
@@ -178,8 +168,9 @@ def plot_weights(radius, mode, pt_range):
                         xaxis=dict(title="layer"))
         layer_fig.update_yaxes(type="log")
 
-        eta_fig.update_layout(yaxis=dict(title=r"$a|\eta|+b$"),
-                              xaxis=dict(title=r"$\eta$"))
+        eta_fig.update_layout(#yaxis=dict(title=r"$a|\eta|+b$"),
+                              yaxis=dict(title=r"$p_T^{Cl} - p_T^{Gen}$"),
+                              xaxis=dict(title=r"$|\eta|$"))
 
     else:
         layer_fig.update_layout(
@@ -192,7 +183,6 @@ def plot_weights(radius, mode, pt_range):
                 "yanchor": "top",
             },
             yaxis=dict(title="Counts"),
-            #xaxis=dict(title=r"$\Huge{\frac{E^{Cl}}{E^{Gen}}}$")
         )
 
     layer_fig.update_yaxes(automargin=True)
@@ -202,6 +192,4 @@ def plot_weights(radius, mode, pt_range):
     eta_fig.update_xaxes(automargin=True)
 
     return layer_fig, eta_fig
-
-#layer_fig = plot_weights(0.01, "official", "weights")
 

@@ -1,3 +1,5 @@
+# pyright: reportGeneralTypeIssues=false
+
 import os
 import sys
 import re
@@ -51,23 +53,6 @@ def get_str(coef, df_dict):
         coef_str = "/coef_{}".format(str(new_coef).replace(".", "p"))
     return coef_str
 
-
-'''def get_dfs(init_files, coef, weighted=False):
-    """Takes a dictionary of input files (keys corresponding to particles, values corresponding to file paths containing DataFrames by coefficient), with a desired coefficient.
-    Returns a new dictionary with the same keys, whose values correspond to the DataFrame of that particular coefficient.
-    """
-    df_dict = dict.fromkeys(init_files.keys(), [0.0])
-    for key in init_files.keys():
-        file = pd.HDFStore(init_files[key], "r")
-        if not isinstance(coef, str):
-            coef = get_str(coef, file)
-        if not coef in file.keys():
-            coef = file.keys()[0]
-        df = file[coef]["original"] if not weighted else file[coef]["weighted"]
-        file.close()
-        df_dict[key] = df
-    return common.dot_dict(df_dict)'''
-
 def get_dfs(init_files, coef, particles="photons"):
     """Takes a dictionary of input files (keys corresponding to particles, values corresponding to file paths containing DataFrames by coefficient), with a desired coefficient.
     Returns a new dictionary with the same keys, whose values correspond to the DataFrame of that particular coefficient.
@@ -91,27 +76,14 @@ def get_keys(init_files):
 
     return keys
 
-
 def read_cl_size_params():
     with open(params.CfgPath, "r") as afile:
         cfg = yaml.safe_load(afile)
     return cfg["clusterStudies"]
 
-
-'''def filter_dfs(dfs_by_particle, eta_range, pt_cut):
-    filtered_dfs = {}
-    for particle, df in dfs_by_particle.items():
-        if not isinstance(df, list) and not df.empty:
-            with common.SupressSettingWithCopyWarning():
-                filtered_dfs[particle] = df[ (df.gen_eta > eta_range[0]) & (df.gen_eta < eta_range[1]) & (df.pt > pt_cut) ]
-                #df = df[ df.matches == True ]
-                #filtered_dfs[particle] = df.groupby("event").apply(lambda x: x.loc[x.pt.idxmax()])
-    return filtered_dfs'''
-
 def filter_dfs(df, eta_range, pt_cut):
     with common.SupressSettingWithCopyWarning():
-        filtered_df = df[ (abs(df.gen_eta) > eta_range[0]) & (df.gen_eta < eta_range[1]) & (df.gen_pt > pt_cut) ]
-        #filtered_df = df[ (abs(df.gen_eta) > eta_range[0]) & (df.gen_eta < eta_range[1]) & (df.gen_pt > pt_cut[0]) & (df.gen_pt < pt_cut[1]) ]        
+        filtered_df = df[ (abs(df.gen_eta) > eta_range[0]) & (df.gen_eta < eta_range[1]) & (df.gen_pt > pt_cut) ]      
     return filtered_df
 
 def effrms(data, c=0.68):
@@ -119,7 +91,6 @@ def effrms(data, c=0.68):
     containing a fraction 'c' of items in a 1D array.
     """
     if isinstance(data, pd.DataFrame):
-        print(data.keys())
         assert(len(data.keys())==1)
         key = list(data.keys())[0]
         sorted = data.sort_values(by=key)
@@ -144,31 +115,6 @@ def effrms(data, c=0.68):
 def get_y_max(dist, nbins=100):
     hist, _ = np.histogram(dist, bins=nbins)
     return np.max(hist)
-
-'''def read_weights(dir, cfg, version="final", mode="weights"):
-    weights_by_particle = {}
-    for particle in ("photons", "electrons", "pions"):
-        if particle == "photons":
-            basename = "optimization_selectOnestd_adjustMaxWeight"
-        elif particle == "electrons":
-            basename = "optimization_selectOnestd"
-        else:
-            basename = "optimization_bound5_selectOnestd"
-        
-        version_dir = "{}/".format(version)
-        particle_dir = "{}{}/optimization/official/{}".format(dir, particle, version_dir)
-
-        files = [f for f in os.listdir(particle_dir) if basename in f]
-        weights_by_radius = {}
-        for file in files:
-            radius = float(file.replace(".hdf5","").replace(f"{basename}_","").replace("r0","0").replace("p","."))
-            infile = particle_dir+file
-            with pd.HDFStore(infile, "r") as optWeights:
-                weights_by_radius[radius] = optWeights[mode]
-    
-        weights_by_particle[particle] = weights_by_radius
-    
-    return weights_by_particle'''
 
 def read_weights(dir, cfg, version="final", mode="weights"):
     weights_by_particle = {}
@@ -208,7 +154,6 @@ def read_pu_weights(cfg):
     weights_by_particle["electrons"] = weights_by_particle["photons"]  
 
     return weights_by_particle             
-
 
 def fill_filename(filename, weight, pileup, eta_corr=0):
     """Takes a base <filename> and three ints which correspond
@@ -286,49 +231,6 @@ def get_global_pt(file, eta_range, pt_cut, pileup, mode="mean"):
 def gaus(x, mean, std):
     return pow(std*np.sqrt(2*np.pi), -1)*np.exp(-pow((x-mean)/std,2)/2)
 
-def get_gaus_mean(df_filt, col):
-    split = df_filt[col].mean() - effrms(df_filt[col].to_frame().rename({0: "pt_norm"}))
-
-    peak = df_filt[ df_filt[col] > split ]
-
-    peak_vals = np.array(peak[col])
-
-    bins = np.linspace(peak_vals.min(), peak_vals.max(), 100)
-    counts, bin_edges = np.histogram(peak_vals, bins=bins, density=True)
-    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-
-    mean_0, sig_0 = bin_centers.mean(), bin_centers.std()
-    p0 = np.array([mean_0, sig_0])
-
-    lower_bounds = 0.01*p0
-    upper_bounds = 100*p0
-    bounds = Bounds(lower_bounds, upper_bounds)
-
-    params, _ = curve_fit(gaus, bin_centers, counts, p0=p0, bounds=bounds)
-    mean, _ = params
-
-    return mean
-
-def get_peak(file, eta_range, pt_cut, pileup):
-    cols = ["pt_norm"] if pileup == "PU0" else ["pt_norm", "pt_norm_eta_corr"]
-    original, weighted, eta = [0.0], [0.0], [0.0]
-    with pd.HDFStore(file, mode="r") as dfs:
-        for radius in dfs.keys():
-            df_o, df_w = dfs[radius]["original"], dfs[radius]["weighted"]
-            df_o, df_w = filter_dfs(df_o, eta_range, pt_cut), filter_dfs(df_w, eta_range, pt_cut)
-            
-            peak_o = get_gaus_mean(df_o, "pt_norm")
-            original.append(peak_o)
-            for col in cols:
-                peak_w = get_gaus_mean(df_w, col)
-                weighted.append(peak_w) if col=="pt_norm" else eta.append(peak_w)
-        pt_peak = {"original": original,
-                   "layer": weighted}
-        if len(eta) > 1:
-            pt_peak.update({"eta": eta})
-    
-    return pt_peak
-
 def get_dataframes(init_files, particles, coef, eta_range, pt_cut):
     df_o, df_w = get_dfs(init_files, coef, particles)
     df_o["gen_eta"], df_w["gen_eta"] = abs(df_o.gen_eta), abs(df_w.gen_eta)
@@ -385,59 +287,183 @@ def get_binned_modes(df, bin_col, var_col, bins=50):
         binned_vals.loc[bin] = binned_vals.loc[bin][norm_bin]
     new_var = var_col + "_binned"
     binned_vals = binned_vals.to_frame().rename({0: new_var},axis=1)
-    #print(df)
     df = df.merge(binned_vals, left_on=bin_col, right_index=True, how="left")
-    #print(df)
     return df.groupby(bin_col).apply(lambda x: x[new_var].mean())
+
+def rms(self, df, col):
+    return df[col].std()/df[col].mean()
     
-'''def write_cms_plots(**kwargs):
-    hep.style.use("CMS")
-    #hep.cms.text("Simulation",loc=1)
-    plt.rcParams['text.usetex'] = True
-    plt.grid(visible=True, which="both")
-
-    if kwargs["hist"] == False:
-        max_x, max_y = [], []
-        for label, trace in kwargs["traces"].items():
-            x_data, y_data = trace["x_data"], trace["y_data"]
-            max_x.append(max(x_data)), max_y.append(max(y_data))
-            plt.scatter(x_data, y_data, label = label)
-        plt.legend()
-    
-    if "hline" in kwargs.keys():
-        val, col, style = kwargs["hline"].values()
-        plt.axhline(y=val, color=col, linestyle=style)
-
-    
-    x_pos = 0.7*max(max_x)
-    #y_pos = 0.9*min(max_y)
-    plt.text(x_pos,0.8, kwargs["eta_text"])
-    #plt.text(0.95, 0.7, kwargs["pt_text"])
-
-    x_label, y_label = kwargs["x_label"], kwargs["y_label"]
-    plt.xlabel(x_label), plt.ylabel(y_label)
-    plt.title(kwargs['plot_title'])
-    plt.savefig(kwargs["plot_path"])
-
-
-def update_particle_callback():
-    from dash import callback, Input, Output, State, callback_context
-    @callback(
-            Output("particle", "value"),
-            Input("particle", "value")
-    )
-    def update_particle(particle):
-        return particle
-
-def update_pileup_callback():
-    from dash import callback, Input, Output, State, callback_context
-    @callback(
-        Output("pileup", "color"),
-        Input("pileup", "n_clicks")
-    )
-    def update_pileup(n_clicks):
-        if n_clicks%2==0:
-            return "primary"
+class clusterData:
+    def __init__(self, dir="dashApp"):
+        self.cfg = read_cl_size_params()
+        self.local = self.cfg["local"]
+        if dir == "dashApp":
+            self.input_files = self.cfg["dashApp"]["local"] if self.cfg["local"] else self.cfg["dashApp"]["EOS"]
         else:
-            return "success"'''
+            self.input_files = self.cfg[dir]
+
+    def get_keys(self, pileup, particles):
+        with pd.HDFStore(self.input_files[pileup][particles], "r") as clFile:
+            radii_keys = clFile.keys()
+        return radii_keys
+
+    def _get_dfs(self, coef, pileup, particles="photons"):
+        """Takes a dictionary of input files (keys corresponding to particles, values corresponding to file paths containing DataFrames by coefficient), with a desired coefficient.
+        Returns a new dictionary with the same keys, whose values correspond to the DataFrame of that particular coefficient.
+        """
+        file = pd.HDFStore(self.input_files[pileup][particles], "r")
+        if not isinstance(coef, str):
+            coef = get_str(coef, file)
+        if not coef in file.keys():
+            coef = file.keys()[0]
+        df_o, df_w= file[coef]["original"], file[coef]["weighted"]
+        file.close()
+        return df_o, df_w
+    
+    def _filter_dfs(self, df, eta_range, pt_cut):
+        with common.SupressSettingWithCopyWarning():
+            filtered_df = df[ (abs(df.gen_eta) > eta_range[0]) & (df.gen_eta < eta_range[1]) & (df.gen_pt > pt_cut) ]      
+        return filtered_df
+
+    def get_dataframes(self, pileup, particles, coef, eta_range, pt_cut):
+        df_o, df_w = self._get_dfs(coef, pileup, particles)
+        df_o["gen_eta"], df_w["gen_eta"] = abs(df_o.gen_eta), abs(df_w.gen_eta)
+        pt_cut = float(pt_cut) if pt_cut!="PT Cut" else 0
+        df_o, df_w = self._filter_dfs(df_o, eta_range, pt_cut), self._filter_dfs(df_w, eta_range, pt_cut)
+
+        return df_o, df_w
+    
+    def _rms(self, df, col):
+        return df[col].std()/df[col].mean()
+    
+    def _eff_rms(self, df, col):
+        return effrms(df[col])/df[col].mean()
+    
+    def _mean(self, df, col):
+        return df[col].mean()
+    
+    def _get_gaus_mean(self, df, col):
+        """Fits a Gaussian to a distribution after having removed the left tail,
+        and returns the mean of the fit."""
+
+        split = df[col].mean() - effrms(df[col].to_frame().rename({0: "pt_norm"}))
+
+        peak = df[ df[col] > split ]
+
+        peak_vals = np.array(peak[col])
+
+        bins = np.linspace(peak_vals.min(), peak_vals.max(), 100)
+        counts, bin_edges = np.histogram(peak_vals, bins=bins, density=True)
+        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+        mean_0, sig_0 = bin_centers.mean(), bin_centers.std()
+        p0 = np.array([mean_0, sig_0])
+
+        lower_bounds = 0.01*p0
+        upper_bounds = 100*p0
+        bounds = Bounds(lower_bounds, upper_bounds)
+
+        params, _ = curve_fit(gaus, bin_centers, counts, p0=p0, bounds=bounds)
+        mean, _ = params
+
+        return mean
+    
+    def _global_props(self, particle, eta_range, pt_cut, pileup, func):
+        """Helper function for global (i.e. all radii) properties. func should
+        be a function that accepts a DataFrame and a corresponding column, and returns
+        some global information on df[col], i.e. mean(), std() etc. _global_props() applies
+        func() to dataframes of each radius."""
+
+        file = self.input_files[pileup][particle]
+        pt_cut = float(pt_cut) if pt_cut != "PT Cut" else 0.0
+        #corrected_col = "pt_norm_eta_corr" if particle != "pions" else "pt_norm_eta_corrected"
+        
+        if particle != "pions":
+            cols = ["pt_norm"] if pileup=="PU0" else ["pt_norm", "pt_norm_eta_corr"]
+        else:
+            cols = ["pt_norm", "pt_norm_en_corrected"] if pileup=="PU0" else ["pt_norm", "pt_norm_en_corrected", "pt_norm_eta_corrected"]
+            en = []
+        
+        original, weighted, eta = [], [], []
+        with pd.HDFStore(file, mode="r") as dfs:
+            for radius in dfs.keys():
+                df_o, df_w = dfs[radius]["original"], dfs[radius]["weighted"]
+                df_o, df_w = self._filter_dfs(df_o, eta_range, pt_cut), self._filter_dfs(df_w, eta_range, pt_cut)
+                
+                o_val = func(df_o, "pt_norm")
+                original.append(o_val)
+                
+                for col in cols:
+                    val = func(df_w, col)
+                    if col=="pt_norm":
+                        weighted.append(val)
+                    elif col == "pt_norm_eta_corr" or col == "pt_norm_eta_corrected":
+                        eta.append(val)
+                    elif col == "pt_norm_en_corrected":
+                        en.append(val)
+
+                '''o_val = func(df_o, "pt_norm")
+                original.append(o_val)
+                for col in cols:
+                    w_val = func(df_w, col)
+                    weighted.append(w_val) if col=="pt_norm" else eta.append(w_val)'''
+        
+        if particle != "pions":
+            return original, weighted, eta
+        else:
+            return original, weighted, en, eta
+    
+    def get_global_res(self, particle, eta_range, pt_cut, pileup):
+        
+        if particle != "pions":
+            o_rms, w_rms, eta_rms = self._global_props(particle, eta_range, pt_cut, pileup, self._rms)
+            o_eff_rms, w_eff_rms, eta_eff_rms = self._global_props(particle, eta_range, pt_cut, pileup, self._eff_rms)
+            
+            res = {"original": {"rms": o_rms, "eff": o_eff_rms},
+                "layer": {"rms": w_rms, "eff": w_eff_rms}}
+        else:
+            o_rms, w_rms, en_rms, eta_rms = self._global_props(particle, eta_range, pt_cut, pileup, self._rms)
+            o_eff_rms, w_eff_rms, en_eff_rms, eta_eff_rms = self._global_props(particle, eta_range, pt_cut, pileup, self._eff_rms)
+
+            res = {"original": {"rms": o_rms, "eff": o_eff_rms},
+                "layer": {"rms": w_rms, "eff": w_eff_rms},
+                "energy": {"rms": en_rms, "eff": en_eff_rms}}
+        
+        if len(eta_rms) > 1:
+            res.update({"eta": {"rms": eta_rms, "eff": eta_eff_rms}})
+        
+        return res
+    
+    def get_global_pt(self, particle, eta_range, pt_cut, pileup, mode="mean"):
+
+        if particle != "pions":
+        
+            if mode == "mean":
+                o, w, eta = self._global_props(particle, eta_range, pt_cut, pileup, self._mean)
+            else:
+                o, w, eta = self._global_props(particle, eta_range, pt_cut, pileup, self._get_gaus_mean)
+            
+            vals = {"original": o,
+                    "weighted": w}
+
+        else:
+
+            if mode == "mean":
+                o, w, en, eta = self._global_props(particle, eta_range, pt_cut, pileup, self._mean)
+            else:
+                o, w, en, eta = self._global_props(particle, eta_range, pt_cut, pileup, self._get_gaus_mean)
+            
+            vals = {"original": o,
+                    "weighted": w,
+                    "energy": en}            
+        
+        if len(eta) > 1:
+            vals.update({"eta": eta})
+        
+        return vals        
+                
+
+
+    
+
     

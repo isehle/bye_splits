@@ -1,37 +1,45 @@
 io:
+  production:
+    photons:
+      dir: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
+      tree: HGCalTriggerNtuple
+      infile: /data_CMS/cms/ehle/L1HGCAL/PU200/photons/skims/skim_tightTC_dRxy_fullEta_photons_200PU_bc_stc_hadd.root
+      outfile: skim_photons_200PU_test.root
+    electrons:
+      dir: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
+      tree: HGCalTriggerNtuple
+      infile: /eos/user/b/bfontana/FPGAs/new_algos/electrons_hadd.root
+      outfile: /eos/user/b/bfontana/FPGAs/new_algos/skim_electrons_default.root
+    pions:
+      dir: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
+      tree: HGCalTriggerNtuple
+      infile: /eos/user/b/bfontana/FPGAs/new_algos/pions_hadd.root
+      outfile: /eos/user/b/bfontana/FPGAs/new_algos/skim_pions_default.root
   PU0:
     photons:
       dir: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
       tree: HGCalTriggerNtuple
-      #file: /data_CMS/cms/ehle/L1HGCAL/PU0/photons/skims/skim_tightTC_dRxy_hadd.root
       file: /data_CMS/cms/ehle/L1HGCAL/PU0/photons/skims/skim_tightTC_dRxy_fullEta_photons_0PU_bc_stc_hadd.root
     electrons:
       dir: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
       tree: HGCalTriggerNtuple
-      #file: /data_CMS/cms/ehle/L1HGCAL/PU0/electrons/skims/skim_tightTC_dRxy_hadd.root
       file: /data_CMS/cms/ehle/L1HGCAL/PU0/electrons/skims/skim_tightTC_dRxy_fullEta_electrons_0PU_bc_stc_hadd.root
     pions:
       dir: hgcalTriggerNtuplizer
-      #dir: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
       tree: HGCalTriggerNtuple
-      #file: /data_CMS/cms/ehle/L1HGCAL/PU0/pions/skims/skim_tightTC_dRxy_hadd.root
-      #file: /data_CMS/cms/ehle/L1HGCAL/PU0/pions/skims/skim_tightTC_dRxy_fullEta_pions_0PU_bc_stc_hadd.root # FAKE: THIS IS ACTUALLY 200PU !!
       file: /data_CMS/cms/ehle/L1HGCAL/PU0/pions/skims/skim_tightTC_dRxy_fullEta_new_pions_0PU_bc_stc_hadd.root
   PU200:
     photons:
       dir: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
       tree: HGCalTriggerNtuple
-      #file: /data_CMS/cms/ehle/L1HGCAL/PU200/photons/skims/skim_tightTC_dRxy_hadd.root
       file: /data_CMS/cms/ehle/L1HGCAL/PU200/photons/skims/skim_tightTC_dRxy_fullEta_photons_200PU_bc_stc_hadd.root
     electrons:
       dir: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
       tree: HGCalTriggerNtuple
-      #file: /data_CMS/cms/ehle/L1HGCAL/PU200/electrons/skims/skim_tightTC_dRxy_hadd.root
       file: /data_CMS/cms/ehle/L1HGCAL/PU200/electrons/skims/skim_tightTC_dRxy_fullEta_electrons_200PU_bc_stc_hadd.root
     pions:
       dir: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
       tree: HGCalTriggerNtuple
-      #file: /data_CMS/cms/ehle/L1HGCAL/PU200/pions/skims/skim_tightTC_dRxy_hadd.root
       file: /data_CMS/cms/ehle/L1HGCAL/PU200/pions/skims/skim_tightTC_dRxy_fullEta_pions_200PU_bc_stc_hadd.root
 
 geometry:
@@ -57,10 +65,8 @@ defaultEvents:
     pions: [9102, 9148]
 
 skim:
-  #inDir: /data_CMS/cms/alves/L1HGCAL/
   inDir: /data_CMS/cms/ehle/L1HGCAL/PU0/
   outDir: /data_CMS/cms/ehle/L1HGCAL/PU0/
-  #rootDir: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
   rootDir: hgcalTriggerNtuplizer
   tree: HGCalTriggerNtuple
   outfileBaseName: tightTC_dRxy_fullEta_TEST
@@ -71,8 +77,6 @@ job:
   proxy: ~/.t3/proxy.cert
   queue: short
   local: False
-  #script: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/bye_splits/production/submit_scripts/calibrate_cluster_energy.sh
-  #arguments: [filename, particles]
   script: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/bye_splits/production/submit_scripts/condor_cluster_size.sh
   arguments: [filename, particles, pileup]
   read_dir: False # {True: read arguments as paths in <submit_dir>/ntuples, False: read arguments stored on the .txt <files>}
@@ -126,7 +130,6 @@ varEvents:
     id: 'good_cl3d_id'
     matches: 'matches'
     dR: 'deltaR'
-    #layer: 'good_cl3d_firstlayer'
 
 varGeometry:
     wu: 'waferu'
@@ -152,95 +155,67 @@ clusterStudies:
   ehleDir: /eos/user/i/iehle/
   dataFolder: data/
   pileup: False
-  reprocess: False # {True: Process the ROOT file, False: read the .parquet if already processed}
-  parquetTag: fullEta
-  #clusterSizeBaseName: cluster_size_weighted_selectOneEffRms_maxSeed
-  #clusterSizeBaseName: cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth
-  #clusterSizeBaseName: cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_bc_stc
-  #clusterSizeBaseName: cluster_size_dRbyLayer_nanZeroes
+  reprocess: True # {True: Process the ROOT file, False: read the .parquet if already processed}
+  reinit: True # Run Fill, Smooth, Seed steps
+  parquetTag: fullEta_MarcoEffTest
   clusterSizeBaseName: cluster_size_funRadiiTest
   coeffs: [0.0, 0.05, 50]
   nevents: -1
   tree: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple/HGCalTriggerNtuple
-  local: False
   combination:
     PU0:
       photons:
-        #sub_dir: photons/cluster/weighted/final/selectOnestd/maxSeed
-        #sub_dir: photons/cluster/weighted/final/selectOnestd/maxSeed/fullEta/negEta/transvSize
         sub_dir: photons/cluster/weighted/final/selectOnestd/maxSeed/fullEta/negEta/smooth/
-        #basename: cluster_size_transvSize
         basename: cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth
       electrons:
-        #sub_dir: electrons/cluster/weighted/final/selectOnestd/maxSeed/photWeights
-        #sub_dir: electrons/cluster/weighted/final/selectOnestd/maxSeed/fullEta/negEta #REMEMBER THAT THIS IS STILL PHOT WEIGHTED
         sub_dir: electrons/cluster/weighted/final/selectOnestd/maxSeed/fullEta/negEta/smooth/
-        #basename: cluster_size_weighted_selectOneEffRms_maxSeed
         basename: cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth
       pions:
-        #sub_dir: pions/cluster/weighted/final/bound5/selectOneStd/maxSeed/fullEta/negEta/
-        #sub_dir: pions/cluster/weighted/final/bound5/selectOneStd/maxSeed/fullEta/negEta/smooth/
-        #sub_dir: pions/cluster/bc_stc/negEta/
         sub_dir: pions/cluster/weighted/final/bound5/selectOneStd/maxSeed/fullEta/negEta/bc_stc
-        #basename: cluster_size_weighted_selectOneEffRms_maxSeed #STILL BOUND 5
-        #basename: cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth
         basename: cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_bc_stc
     PU200:
       photons:
-        #sub_dir: photons/cluster/weighted/selectOneStd/maxSeed
-        #basename: cluster_size_weighted_selectOneStd_bound5_maxSeed
         sub_dir: photons/cluster/weighted/selectOneStd/maxSeed/negEta/smooth
         basename: cluster_size_fullEta_weighted_selectOneEffRms_maxSeed
       electrons:
-        #sub_dir: electrons/cluster/weighted/selectOneStd/maxSeed/photWeights
-        #basename: cluster_size_photWeighted_selectOneEffRms_maxSeed
         sub_dir: electrons/cluster/weighted/selectOneStd/maxSeed/posEta/smooth
         basename: cluster_size_fullEta_weighted_selectOneEffRms_maxSeed
       pions:
         sub_dir: pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/negEta
         basename: cluster_size_fullEta_weighted_selectOneEffRms_maxSeed
   dashApp:
-    PU0:       
-      #photons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/photons/cluster/weighted/final/selectOnestd/maxSeed/cluster_size_weighted_selectOneStd_adjustMaxWeight_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5
-      #photons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/photons/cluster/weighted/final/selectOnestd/maxSeed/fullEta/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
-      photons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/photons/cluster/weighted/final/selectOnestd/maxSeed/fullEta/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
-      #electrons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/weighted/final/selectOnestd/maxSeed/cluster_size_weighted_selectOneStd_adjustMaxWeight_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5
-      #electrons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/weighted/final/selectOnestd/maxSeed/photWeights/cluster_size_photWeighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5
-      #electrons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/weighted/final/selectOnestd/maxSeed/fullEta/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
-      #electrons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/weighted/final/selectOnestd/maxSeed/fullEta/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
-      #pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/weighted/final/bound5/selectOneStd/maxSeed/cluster_size_weighted_selectOneStd_bound5_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5
-      #pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/weighted/final/bound5/selectOneStd/maxSeed/fullEta/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
-      #pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/weighted/final/bound5/selectOneStd/maxSeed/fullEta/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
-      pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/weighted/final/bound5/selectOneStd/maxSeed/fullEta/posEta/bc_stc/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_bc_stc_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
-    PU200:
-      #photons: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/photons/cluster/weighted/selectOneStd/maxSeed/cluster_size_weighted_selectOneStd_bound5_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5
-      photons: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/photons/cluster/weighted/selectOneStd/maxSeed/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
-      #photons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/photons/cluster/weighted/selectOneStd/maxSeed/fullEta/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
-      #electrons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/electrons/cluster/weighted/selectOneStd/maxSeed/cluster_size_weighted_selectOneStd_bound5_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5
-      #electrons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/electrons/cluster/weighted/selectOneStd/maxSeed/photWeights/cluster_size_photWeighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5
-      #electrons: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/electrons/cluster/weighted/selectOneStd/maxSeed/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
-      electrons: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/electrons/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
-      #electrons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/electrons/cluster/weighted/selectOneStd/maxSeed/fullEta/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
-      #pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/cluster_size_weighted_selectOneStd_bound5_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5
-      #pions: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
-      #pions: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
-      pions: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_lessCols.hdf5
-      #pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/fullEta/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
+    local:
+      PU0:       
+        photons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/photons/cluster/weighted/final/selectOnestd/maxSeed/fullEta/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
+        electrons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/weighted/final/selectOnestd/maxSeed/fullEta/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
+        #pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/weighted/final/bound5/selectOneStd/maxSeed/fullEta/posEta/bc_stc/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_bc_stc_ThresholdDummyHistomaxnoareath20_filtered_fullEta_enCalibrated.hdf5
+        pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/weighted/final/bound5/selectOneStd/maxSeed/fullEta/posEta/bc_stc/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_bc_stc_ThresholdDummyHistomaxnoareath20_filtered_fullEta_enCalibrated_byNorm.hdf5
+      PU200:
+        photons: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/photons/cluster/weighted/selectOneStd/maxSeed/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
+        electrons: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/electrons/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
+        #pions: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_en_eta_calibrated.hdf5
+        pions: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_en_eta_calibrated_byNorm.hdf5
+    EOS:
+      PU0:
+        photons: /eos/user/i/iehle/data/PU0/photons/weighted/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
+        electrons: /eos/user/i/iehle/data/PU0/electrons/weighted/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
+        pions: /eos/user/i/iehle/data/PU0/pions/weighted/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
+      PU200:
+        photons: /eos/user/i/iehle/data/PU200/photons/weighted/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
+        electrons: /eos/user/i/iehle/data/PU200/electrons/weighted/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
+        pions: /eos/user/i/iehle/data/PU200/pions/weighted/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_lessCols.hdf5
   optimization:
     PU0:
       photons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/photons/cluster/photons_PU0_cluster_size_ThresholdDummyHistomaxnoareath20.hdf5
       electrons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5
-      pions: data/new_algos/PU0/pions/cluster/fullEvents/cluster_size_eventTest_ThresholdDummyHistomaxnoareath20.hdf5
+      pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/weighted/final/bound5/selectOneStd/maxSeed/fullEta/posEta/bc_stc/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_bc_stc_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
     PU200:
       photons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/photons/cluster/weighted/selectOneStd/maxSeed/negEta/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5
       electrons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/electrons/cluster/weighted/selectOneStd/maxSeed/negEta/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5
-      #pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/posEta/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20.hdf5
-      pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/negEta/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5
+      pions: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
       weights:
         photons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/photons/cluster/weighted/selectOneStd/maxSeed/posEta/smooth/etaCorr.hdf5
-        #pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/posEta/smooth/etaCorr_new.hdf5
-        #pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/etaCorr_fullDist.hdf5
-        pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/etaCorr_noIntercept.hdf5
+        pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/etaCorr_fromCenter.hdf5
     baseName: optimization_selectOneEffRms_maxSeed
     pt_cut: 5
     cl_pt_cut: 3
@@ -344,28 +319,3 @@ seed_roi:
   SeedOut: 'seed_roi'
   histoThreshold: 20.
   hexDist: True
-
-tcPlot:
-  radius: 0.01
-  baseName: cluster_size
-  plotName: tc_occupancy_new
-  PU0:
-    photons:
-      files: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/photons/cluster/photons_PU0_cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
-      events: []
-    electrons:
-      files: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
-      events: []
-    pions:
-      files: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
-      events: []
-  PU200:
-    photons:
-      files: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/photons/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
-      events: [5284, 183503, 1545]
-    electrons:
-      files: [/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/electrons/cluster/cluster_size_ThresholdDummyHistomaxnoareath20.hdf5]
-      events: []    
-    pions:
-      files: []
-      events: []

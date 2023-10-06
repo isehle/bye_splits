@@ -1,5 +1,8 @@
 # coding: utf-8
 
+# pyright: reportUnboundVariable=false
+# pyright: reportUnusedExpression=false
+
 _all_ = []
 
 import os
@@ -274,8 +277,8 @@ def layer_weights(pars, cfg):
 
     return weights
 
-def eta_correction(df_pu):
-    X = df_pu[["eta"]]
+def eta_correction(df_pu, col="eta"):
+    X = df_pu[[col]]
     y = df_pu.gen_pt - df_pu.pt
     corr = LinearRegression(fit_intercept=False).fit(X, y)
     return corr
@@ -345,16 +348,11 @@ if __name__ == "__main__":
         if pars.radius != None:
             radius_key = "coef_{}".format(radius_str)
         #cl_file = cfg["clusterStudies"]["optimization"]["PU200"][pars.particles]
-        #cl_file = "/home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/photons/cluster_size_etaCal_test.hdf5"
-        #cl_file = "data/new_algos/PU200/electrons/cluster_size_negEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5"
-        #cl_file = "data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/posEta/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5"
-        #cl_file = "data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5"
-        #cl_file = "data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/negEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered.hdf5"
-        cl_file = "data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_lessCols.hdf5"
+        cl_file = "data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5"
 
         if pars.etaCal == None:
-            #eta_file = os.path.dirname(cl_file) + "/etaCorr_fromCenter_new.hdf5"
-            eta_file = os.path.dirname(cl_file) + "/etaCorr_noIntercept.hdf5"
+            eta_file = os.path.dirname(cl_file) + "/etaCorr_fromCenter_new.hdf5"
+
             print("\nWriting: ", eta_file)
             with pd.HDFStore(cl_file, "a") as clFile:
                 if pars.radius != None:

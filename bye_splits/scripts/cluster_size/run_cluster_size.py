@@ -76,7 +76,7 @@ def cluster_size(pars, cfg):
             fill_d = params.read_task_params("fill")
             tasks.fill.fill(pars, df_gen, df_cl, df_tc, **fill_d)
 
-        if not pars.no_smooth:
+        '''if not pars.no_smooth:
             smooth_d = params.read_task_params("smooth")
             tasks.smooth.smooth(pars, **smooth_d)
 
@@ -108,7 +108,7 @@ def cluster_size(pars, cfg):
             )
             coef_keys = clSizeOut.keys()
             for coef in coef_keys[1:]:
-                clSizeOut[coef] = normalize_df(clSizeOut[coef], df_gen)
+                clSizeOut[coef] = normalize_df(clSizeOut[coef], df_gen)'''
 
 
 if __name__ == "__main__":
