@@ -19,6 +19,15 @@ import pandas as pd
 import h5py
 from tqdm import tqdm
 
+def get_layer_pts(df, tc_info, event):
+    layer_df = df.groupby(["tc_layer"], group_keys=True).apply(lambda x: x.tc_pt.sum()).to_frame()
+    layer_df.rename({0: "tc_pt_sum"}, axis=1, inplace=True)
+    layer_df = layer_df[ layer_df.index.get_level_values("tc_layer") != 1.0 ]
+
+    tc_info[event] = layer_df
+
+    return tc_info
+
 def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
     dfout = None
     df_tc = []
@@ -31,6 +40,8 @@ def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
     assert len(skeys) == len(tckeys)
     radiusCoeffB = kw["CoeffB"]
     empty_seeds = 0
+
+    tc_info = {}
 
     for tck, seedk in tqdm(zip(tckeys, skeys), total=len(tckeys)):
         tc = stc[tck]
@@ -95,54 +106,69 @@ def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
 
         df = pd.DataFrame(res, columns=cols)
 
-        df["cl3d_pos_x"] = df.tc_x * df.tc_mipPt
-        df["cl3d_pos_y"] = df.tc_y * df.tc_mipPt
-        df["cl3d_pos_z"] = df.tc_z * df.tc_mipPt
-
-        cl3d_cols = ["cl3d_pos_x", "cl3d_pos_y", "cl3d_pos_z", "tc_mipPt", "tc_pt"]
-        cl3d = df.groupby(["seed_idx"]).sum()[cl3d_cols]
-        cl3d = cl3d.rename(columns={"cl3d_pos_x": "x",
-                                    "cl3d_pos_y": "y",
-                                    "cl3d_pos_z": "z",
-                                    "tc_mipPt": "mipPt",
-                                    "tc_pt": "pt",
-                                    })
-
-        cl3d = cl3d[cl3d.pt > kw["PtC3dThreshold"]]
-        cl3d.loc[:, ["x", "y", "z"]] = cl3d.loc[:, ["x", "y", "z"]].div(
-            cl3d.mipPt, axis=0
-        )
-
-        cl3d_dist = np.sqrt(cl3d.x**2 + cl3d.y**2)
-        cl3d["phi"] = np.arctan2(cl3d.y, cl3d.x)
-        cl3d["eta"] = np.arcsinh(cl3d.z / cl3d_dist)
-        cl3d["Rz"] = common.calcRzFromEta(cl3d.eta)
-        cl3d["en"] = cl3d.pt * np.cosh(cl3d.eta)
-
         search_str = "{}_([0-9]{{1,7}})_tc".format(kw["FesAlgo"])
         event_number = re.search(search_str, tck)
-        if not event_number:
-            m = "The event number was not extracted!"
-            raise ValueError(m)
 
-        cl3d["event"] = event_number.group(1)
-        cl3d_cols = ["en", "pt", "x", "y", "z", "Rz", "eta", "phi"]
-        sout[key] = cl3d[cl3d_cols]
-        if tck == tckeys[0] and seedk == skeys[0]:
-            dfout = cl3d[cl3d_cols + ["event"]]
+        event = int(event_number.group(1))
+
+        if kw["layerWeights"]:
+            try:
+                tc_info = get_layer_pts(df, tc_info, event)
+            except AttributeError:
+                assert(df.empty)
+                continue
+
         else:
-            dfout = pd.concat((dfout, cl3d[cl3d_cols + ["event"]]), axis=0)
+            df["cl3d_pos_x"] = df.tc_x * df.tc_mipPt
+            df["cl3d_pos_y"] = df.tc_y * df.tc_mipPt
+            df["cl3d_pos_z"] = df.tc_z * df.tc_mipPt
 
-        df_tc.append(df[['seed_idx', 'tc_wu', 'tc_wv', 'tc_cu', 'tc_cv', 'tc_layer']])
+            cl3d_cols = ["cl3d_pos_x", "cl3d_pos_y", "cl3d_pos_z", "tc_mipPt", "tc_pt"]
+            cl3d = df.groupby(["seed_idx"]).sum()[cl3d_cols]
+            cl3d = cl3d.rename(columns={"cl3d_pos_x": "x",
+                                        "cl3d_pos_y": "y",
+                                        "cl3d_pos_z": "z",
+                                        "tc_mipPt": "mipPt",
+                                        "tc_pt": "pt",
+                                        })
+
+            cl3d = cl3d[cl3d.pt > kw["PtC3dThreshold"]]
+            cl3d.loc[:, ["x", "y", "z"]] = cl3d.loc[:, ["x", "y", "z"]].div(
+                cl3d.mipPt, axis=0
+            )
+
+            cl3d_dist = np.sqrt(cl3d.x**2 + cl3d.y**2)
+            cl3d["phi"] = np.arctan2(cl3d.y, cl3d.x)
+            cl3d["eta"] = np.arcsinh(cl3d.z / cl3d_dist)
+            cl3d["Rz"] = common.calcRzFromEta(cl3d.eta)
+            cl3d["en"] = cl3d.pt * np.cosh(cl3d.eta)
+
+            search_str = "{}_([0-9]{{1,7}})_tc".format(kw["FesAlgo"])
+            event_number = re.search(search_str, tck)
+            if not event_number:
+                m = "The event number was not extracted!"
+                raise ValueError(m)
+
+            cl3d["event"] = event_number.group(1)
+            cl3d_cols = ["en", "pt", "x", "y", "z", "Rz", "eta", "phi"]
+            sout[key] = cl3d[cl3d_cols]
+            if tck == tckeys[0] and seedk == skeys[0]:
+                dfout = cl3d[cl3d_cols + ["event"]]
+            else:
+                dfout = pd.concat((dfout, cl3d[cl3d_cols + ["event"]]), axis=0)
+
+            df_tc.append(df[['seed_idx', 'tc_wu', 'tc_wv', 'tc_cu', 'tc_cv', 'tc_layer']])
     print("[clustering step] There were {} events without seeds.".format(empty_seeds))
 
     splot = pd.HDFStore(out_plot, mode='w')
-    if dfout is not None:
+    if dfout is not None and not kw["layerWeights"]:
         dfout.event = dfout.event.astype(int)
         splot["data"] = dfout
         for i, df in enumerate(df_tc):
             key = f'df_{dfout.event.unique()[i]}'  
             splot.put(key, df)
+    elif kw["layerWeights"]:
+        return tc_info
     else:
         raise RuntimeError("No output in the cluster.")
 
