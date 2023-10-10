@@ -19,11 +19,13 @@ io:
     photons:
       dir: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
       tree: HGCalTriggerNtuple
-      file: /data_CMS/cms/alves/L1HGCAL/skim_with_pt_ntuple_1.root #/data_CMS/cms/ehle/L1HGCAL/PU0/photons/skims/skim_tightTC_dRxy_fullEta_photons_0PU_bc_stc_hadd.root
+      #file: /data_CMS/cms/alves/L1HGCAL/skim_with_pt_ntuple_1.root #/data_CMS/cms/ehle/L1HGCAL/PU0/photons/skims/skim_tightTC_dRxy_fullEta_photons_0PU_bc_stc_hadd.root
+      file: /data_CMS/cms/ehle/L1HGCAL/PU0/photons/skims/skim_tightTC_dRxy_fullEta_photons_0PU_bc_stc_hadd.root
     electrons:
       dir: FloatingpointMixedbcstcrealsig4DummyHistomaxxydr015GenmatchGenclustersntuple
       tree: HGCalTriggerNtuple
-      file: /eos/user/i/iehle/data/PU0/photons/skim_photons_0PU_bc_stc_hadd.root #/data_CMS/cms/ehle/L1HGCAL/PU0/electrons/skims/skim_tightTC_dRxy_fullEta_electrons_0PU_bc_stc_hadd.root
+      #file: /eos/user/i/iehle/data/PU0/photons/skim_photons_0PU_bc_stc_hadd.root #/data_CMS/cms/ehle/L1HGCAL/PU0/electrons/skims/skim_tightTC_dRxy_fullEta_electrons_0PU_bc_stc_hadd.root
+      file: /data_CMS/cms/ehle/L1HGCAL/PU0/electrons/skims/skim_tightTC_dRxy_fullEta_electrons_0PU_bc_stc_hadd.root
     pions:
       dir: hgcalTriggerNtuplizer
       tree: HGCalTriggerNtuple
@@ -72,7 +74,7 @@ varEvents:
     geta: 'good_genpart_exeta'
     gphi: 'good_genpart_exphi'
     gen: 'good_genpart_energy'
-    gpt: 'good_genpart_pt'
+#    gpt: 'good_genpart_pt'
   tc:
     event: 'event'
     wu: 'good_tc_waferu'
@@ -143,8 +145,8 @@ clusterStudies:
   pileup: False
   reprocess: False # {True: Process the ROOT file, False: read the .parquet if already processed}
   reinit: True # Run Fill, Smooth, Seed steps
-  parquetTag: fullEta_layerWeightTest
-  clusterSizeBaseName: cluster_size_layerWeightTest
+  parquetTag: fullEta_layerWeightTest_allEvents
+  clusterSizeBaseName: cluster_size_layerWeightTest_allEvents
   radius: 0.01
   coeffs: [0.0, 0.05, 50]
   nevents: -1
@@ -203,7 +205,7 @@ clusterStudies:
       weights:
         photons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/photons/cluster/weighted/selectOneStd/maxSeed/posEta/smooth/etaCorr.hdf5
         pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/etaCorr_fromCenter.hdf5
-    baseName: optimization_selectOneEffRms_calibTest
+    baseName: layer_weights_selectOneEffRms
     pt_cut: 5
     cl_pt_cut: 3
     eta_min: 1.6

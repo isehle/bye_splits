@@ -28,9 +28,59 @@ def get_layer_pts(df, tc_info, event):
 
     return tc_info
 
+def write_cl3d(df, event, **kw):
+    """Writes the cluster dataframe starting from
+    the TCs, applying weights if needed."""
+    
+    weights = kw["applyWeights"] if "applyWeights" in kw.keys() else None
+
+    cl3d_cols = ["cl3d_pos_x", "cl3d_pos_y", "cl3d_pos_z", "tc_mipPt", "tc_pt"]
+
+    col_dict = {"cl3d_pos_x": "x",
+                "cl3d_pos_y": "y",
+                "cl3d_pos_z": "z",
+                "tc_mipPt": "mipPt",
+                "tc_pt": "pt",
+                }
+
+    df["cl3d_pos_x"] = df.tc_x * df.tc_mipPt
+    df["cl3d_pos_y"] = df.tc_y * df.tc_mipPt
+    df["cl3d_pos_z"] = df.tc_z * df.tc_mipPt
+
+    if weights is not None:
+        df = df.merge(weights, left_on="tc_layer", right_index=True)
+        df["weighted_tc_pt"] = df.tc_pt * df.weights
+
+        cl3d_cols += ["weighted_tc_pt"]
+        col_dict.update({"weighted_tc_pt": "weighted_pt"})
+        
+
+    cl3d = df.groupby(["seed_idx"]).sum()[cl3d_cols]
+    cl3d = cl3d.rename(columns=col_dict)
+
+    cl3d = cl3d[cl3d.pt > kw["PtC3dThreshold"]]
+    cl3d.loc[:, ["x", "y", "z"]] = cl3d.loc[:, ["x", "y", "z"]].div(
+        cl3d.mipPt, axis=0
+    )
+
+    cl3d_dist = np.sqrt(cl3d.x**2 + cl3d.y**2)
+    cl3d["phi"] = np.arctan2(cl3d.y, cl3d.x)
+    cl3d["eta"] = np.arcsinh(cl3d.z / cl3d_dist)
+    cl3d["Rz"] = common.calcRzFromEta(cl3d.eta)
+    cl3d["en"] = cl3d.pt * np.cosh(cl3d.eta)
+
+    cl3d["event"] = event
+    cl3d_cols = ["en", "pt", "x", "y", "z", "Rz", "eta", "phi"]
+
+    if weights is not None:
+        cl3d_cols += ["weighted_pt"]
+
+    return cl3d, cl3d_cols
+
 def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
     dfout = None
     df_tc = []
+
     sseeds = h5py.File(in_seeds, mode='r')
     sout = pd.HDFStore(out_valid, mode='w')
     stc = h5py.File(in_tc, mode='r')
@@ -119,38 +169,8 @@ def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
                 continue
 
         else:
-            df["cl3d_pos_x"] = df.tc_x * df.tc_mipPt
-            df["cl3d_pos_y"] = df.tc_y * df.tc_mipPt
-            df["cl3d_pos_z"] = df.tc_z * df.tc_mipPt
+            cl3d, cl3d_cols = write_cl3d(df, event, **kw)
 
-            cl3d_cols = ["cl3d_pos_x", "cl3d_pos_y", "cl3d_pos_z", "tc_mipPt", "tc_pt"]
-            cl3d = df.groupby(["seed_idx"]).sum()[cl3d_cols]
-            cl3d = cl3d.rename(columns={"cl3d_pos_x": "x",
-                                        "cl3d_pos_y": "y",
-                                        "cl3d_pos_z": "z",
-                                        "tc_mipPt": "mipPt",
-                                        "tc_pt": "pt",
-                                        })
-
-            cl3d = cl3d[cl3d.pt > kw["PtC3dThreshold"]]
-            cl3d.loc[:, ["x", "y", "z"]] = cl3d.loc[:, ["x", "y", "z"]].div(
-                cl3d.mipPt, axis=0
-            )
-
-            cl3d_dist = np.sqrt(cl3d.x**2 + cl3d.y**2)
-            cl3d["phi"] = np.arctan2(cl3d.y, cl3d.x)
-            cl3d["eta"] = np.arcsinh(cl3d.z / cl3d_dist)
-            cl3d["Rz"] = common.calcRzFromEta(cl3d.eta)
-            cl3d["en"] = cl3d.pt * np.cosh(cl3d.eta)
-
-            search_str = "{}_([0-9]{{1,7}})_tc".format(kw["FesAlgo"])
-            event_number = re.search(search_str, tck)
-            if not event_number:
-                m = "The event number was not extracted!"
-                raise ValueError(m)
-
-            cl3d["event"] = event_number.group(1)
-            cl3d_cols = ["en", "pt", "x", "y", "z", "Rz", "eta", "phi"]
             sout[key] = cl3d[cl3d_cols]
             if tck == tckeys[0] and seedk == skeys[0]:
                 dfout = cl3d[cl3d_cols + ["event"]]
@@ -158,6 +178,7 @@ def cluster(pars, in_seeds, in_tc, out_valid, out_plot, **kw):
                 dfout = pd.concat((dfout, cl3d[cl3d_cols + ["event"]]), axis=0)
 
             df_tc.append(df[['seed_idx', 'tc_wu', 'tc_wv', 'tc_cu', 'tc_cv', 'tc_layer']])
+
     print("[clustering step] There were {} events without seeds.".format(empty_seeds))
 
     splot = pd.HDFStore(out_plot, mode='w')

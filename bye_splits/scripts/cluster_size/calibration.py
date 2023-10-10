@@ -20,17 +20,19 @@ import numpy as np
 import pandas as pd
 
 import yaml
+from tqdm import tqdm
 
 from scipy.optimize import lsq_linear
 from sklearn.linear_model import LinearRegression
 
 class Correction:
-    def __init__(self, particle, eta_range, pt_cut):
+    def __init__(self, particles, eta_range, pt_cut):
         self.cluster_data = cl_helpers.clusterData(dir="optimization")
-        self.particle = particle
+        self.particles = particles
+        self.radius = (0.01)*(self.particles=="photons") + (0.015)*(self.particles=="electrons") + (0.02)*(self.particles=="pions")
         self.eta_range = eta_range
         self.pt_cut = pt_cut
-        self.radii_keys = self.cluster_data.get_keys("PU0", particle)
+        self.radii_keys = self.cluster_data.get_keys("PU0", particles)
 
     def _get_params_and_cfg(self):
         parser = argparse.ArgumentParser(description="parameters")
@@ -42,7 +44,7 @@ class Correction:
 
         return common.dot_dict(vars(FLAGS)), cfg
 
-    def _get_tc_pt_by_layer(self, radius):
+    def _get_cl_input_files(self, radius):
         pars, cfg = self._get_params_and_cfg()
 
         cluster_d = params.read_task_params("cluster")
@@ -60,9 +62,15 @@ class Correction:
         for key in ("ClusterInTC", "ClusterInSeeds", "ClusterOutPlot", "ClusterOutValidation"):
             name = cluster_d[key]
 
-            cluster_d[key] =  "{}_PU0_{}_posEta_9oct".format(self.particle, name)
+            cluster_d[key] =  "{}_PU0_{}_posEta_10oct".format(self.particles, name)
 
         cluster_d["layerWeights"] = True
+
+        return pars, cluster_d
+
+    def _get_tc_pt_by_layer(self, radius):
+
+        pars, cluster_d = self._get_cl_input_files(radius=radius)
         
         tc_info = cluster.cluster_default(pars, **cluster_d)
         
@@ -83,12 +91,12 @@ class Correction:
 
         return layers
 
-    def _select_events(self, radius):
+    def _get_gen_df(self):
         pars, cfg = self._get_params_and_cfg()
         ds_gen, _, _ = data_process.get_data_reco_chain_start(nevents=pars["nevents"],
                                                               reprocess="False",
                                                               tag=cfg["clusterStudies"]["parquetTag"],
-                                                              particles=self.particle)
+                                                              particles=self.particles)
 
         if "gen_pt" not in ds_gen.keys():
             ds_gen["gen_pt"] = ds_gen.gen_en/np.cosh(ds_gen.gen_eta)
@@ -96,13 +104,18 @@ class Correction:
         ds_gen.set_index("event", inplace=True)
 
         gen_pt_cut = cfg["clusterStudies"]["optimization"]["pt_cut"]
-        cl_pt_cut = cfg["clusterStudies"]["optimization"]["cl_pt_cut"]
 
         eta_min = cfg["clusterStudies"]["optimization"]["eta_min"]
         eta_max = cfg["clusterStudies"]["optimization"]["eta_max"]
         
         ds_gen = ds_gen[ (ds_gen.gen_pt >= gen_pt_cut) & (ds_gen.gen_eta >= eta_min) & (ds_gen.gen_eta <= eta_max) ]
 
+        return ds_gen
+
+    def _select_events(self, radius, ds_gen):
+        _, cfg = self._get_params_and_cfg()
+        cl_pt_cut = cfg["clusterStudies"]["optimization"]["cl_pt_cut"]
+        
         layers = self._get_layers(radius)
 
         sub_layers = layers.groupby("event").apply(lambda x: x.tc_pt_sum.sum()).to_frame().rename({0: "cl_pt"}, axis=1)
@@ -117,8 +130,8 @@ class Correction:
 
         return ds_gen, layers
 
-    def get_layer_weights(self, radius):
-        ds_gen, layers = self._select_events(radius)
+    def get_layer_weights(self, radius, ds_gen):
+        ds_gen, layers = self._select_events(radius, ds_gen)
         
         ds_gen.sort_index(level="event", inplace=True)
         layers.sort_index(level="event", inplace=True)
@@ -126,7 +139,7 @@ class Correction:
         layers = layers.unstack(level="tc_layer").fillna(0.0)
         gen_pt = ds_gen.gen_pt
 
-        max_weight = 2.0 if self.particle != "pions" else 5.0
+        max_weight = 2.0 if self.particles != "pions" else 5.0
 
         regression = lsq_linear(layers,
                                 #ds_gen,
@@ -150,7 +163,7 @@ class Correction:
 
         return weights
 
-    def save_layer_weights(self):
+    def _weight_file_path(self, all_radii=True):
         pars, cfg = self._get_params_and_cfg()
         
         local = cfg["clusterStudies"]["local"]
@@ -158,12 +171,49 @@ class Correction:
         base_path = params.LocalStorage if local else params.EOSStorage("iehle", "data")
         basename = cfg["clusterStudies"]["optimization"]["baseName"]
 
-        out_path = "{}{}.hdf5".format(base_path, basename)
+        if not all_radii: basename += "_r_" + str(self.radius).replace(".", "p")
 
+        out_path = "{}PU0/{}/weights/{}.hdf5".format(base_path, self.particles, basename)
+
+        return out_path
+
+    def save_layer_weights(self, all_radii=True):
+        ds_gen = self._get_gen_df()
+
+        out_path = self._weight_file_path(all_radii=all_radii)
 
         with pd.HDFStore(out_path, "w") as weightFile:
-            for radius in self.radii_keys[1:]:
-                weightFile[radius] = self.get_layer_weights(radius)
+            print("\nSaving weights to {}\n".format(out_path))
+            if all_radii:
+                for r in tqdm(self.radii_keys[1:], total=len(self.radii_keys[1:])):
+                    weightFile[r] = self.get_layer_weights(r, ds_gen)
+            else:
+                weightFile["weights"] = self.get_layer_weights(self.radius, ds_gen)
+
+    def read_weights(self, radius=None, all_radii_file=True, type="layer"):
+        path = self._weight_file_path(all_radii=all_radii_file)
+
+        with pd.HDFStore(path, "r") as weightFile:
+            if all_radii_file:
+                return weightFile[self.radius] if radius==None else weightFile[radius]
+            else:
+                return weightFile["weights"]
+
+    def apply_layer_weights(self, radius=None, all_radii_file=True):
+        r = self.radius if radius == None else radius
+
+        pars, cluster_d = self._get_cl_input_files(radius=r)
+        weights = self.read_weights(radius=radius, all_radii_file=all_radii_file)
+
+        for key in ("ClusterOutPlot", "ClusterOutValidation"):
+            name = cluster_d[key]
+
+            cluster_d[key] =  "{}_NOTweighted".format(name)
+
+        cluster_d["layerWeights"] = False
+        cluster_d["applyWeights"] = weights
+
+        _ = cluster.cluster_default(pars, **cluster_d)
 
 
     def _lin_reg_add(self, df, corr_col, pt_col="pt", mode="diff"):
@@ -245,7 +295,7 @@ class Correction:
                 # Calculate energy correction from the layer weighted PU0 distribution
                 # and apply it to the pt column
                 df_o, df_w = self.cluster_data.get_dataframes(pileup="PU0",
-                                                            particles=self.particle,
+                                                            particles=self.particles,
                                                             coef=radius,
                                                             eta_range=self.eta_range,
                                                             pt_cut=self.pt_cut)
@@ -262,7 +312,7 @@ class Correction:
 
                 # Apply energy correction to layer weighted PU200 pt column
                 df_pu_o, df_pu_w = self.cluster_data.get_dataframes(pileup="PU200",
-                                                                    particles=self.particle,
+                                                                    particles=self.particles,
                                                                     coef=radius,
                                                                     eta_range=self.eta_range,
                                                                     pt_cut=self.pt_cut)
@@ -288,8 +338,12 @@ class Correction:
         
         return pd.DataFrame(df_dict), pd.DataFrame(df_dict_pu), pd.DataFrame(en_dict), pd.DataFrame(eta_dict)
 
-corr = Correction(particle="photons",
+corr = Correction(particles="photons",
                   eta_range=[1.7, 2.7],
                   pt_cut=10)
 
-corr.save_layer_weights()
+#corr.save_layer_weights(all_radii=False)
+
+#weight_df = corr.read_weights(all_radii_file=False)
+
+corr.apply_layer_weights(all_radii_file=False)
