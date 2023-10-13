@@ -56,9 +56,7 @@ layout = dbc.Container(
         html.Br(),
         dcc.Tabs(
             id = "particle",
-            #value = "photons",
-            value = "pions",
-            #value = "electrons",
+            value = "photons",
             children = [
                 dcc.Tab(label = "Photons", value = "photons"),
                 dcc.Tab(label = "Electrons", value = "electrons"),
@@ -68,7 +66,7 @@ layout = dbc.Container(
         dbc.Row(
             children = [
                 dbc.Col(
-                    dbc.Button("Pile Up", id="pileup", color="primary", n_clicks=1),
+                    dbc.Button("Pile Up", id="pileup", color="primary", n_clicks=0),
                     width = 2,
                 ),
                 dbc.Col(
@@ -89,8 +87,6 @@ layout = dbc.Container(
         html.Br(),
         html.Label("Coef:"),
         dcc.Slider(id="coef", min=0.0, max=0.05, value=0.01, marks=marks),
-        #html.Label("PT Cut: "),
-        dcc.RangeSlider(id="pt_range", min=10, max=200, step=10, value=[10, 200]),
         html.Label("EtaRange:"),
         dcc.RangeSlider(id="eta_range", min=1.7, max=2.9, step=0.1, value=[1.7, 2.7]),
         html.Label("Distribution Range (Eff_RMS):"),
@@ -112,14 +108,12 @@ layout = dbc.Container(
     Input("eta_range", "value"),
     Input("sig_range", "value"),
     Input("pt_cut","value"),
-    #Input("pt_range","value"),
     Input("pileup", "n_clicks"),
     Input("download", "n_clicks")
 )
 ##############################################################################################################################
 
 def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
-#def plot_dists(particle, coef, eta_range, sig_range, pt_range, pileup):
     global glob_res
     pileup_key = "PU0" if pileup%2==0 else "PU200"
 
@@ -141,7 +135,6 @@ def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
     diff_means = {}
 
     dist_args = {"traces": {"111": {}}}
-    #dist_args["vline"] = {"val": 1.0, "color": "black", "linestyle": "--"}
     for key in dists.keys():
         df = dists[key]
         if key == "original":
@@ -149,16 +142,7 @@ def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
         else:
             col_names = weighted_cols[pileup_key]
 
-        for col_name in col_names:
-            '''if key != "original":
-                calib_name = "Eta Correction" if particle != "pions" else "Energy and Eta Correction"
-
-                name = "Layer Weights" if col_name == "pt_norm" else calib_name
-                color = "red" if col_name == "pt_norm" else "green"
-            else:
-                name = "Original"
-                color = "blue"'''
-            
+        for col_name in col_names:            
             if key == "original":
                 color = "blue"
                 name = key.capitalize()
@@ -166,20 +150,12 @@ def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
                 if col_name == "pt_norm":
                     color = "red"
                     name = "Layer Weighted"
-                elif col_name == "pt_norm_eta_corrected":
+                elif col_name == "pt_norm_eta_corrected" or col_name == "pt_norm_eta_corr":
                     color = "green"
                     name = "Eta Corrected"
                 elif col_name == "pt_norm_en_corrected":
                     color = "purple"
                     name = "Energy Corrected"
-            '''elif key == "energy":
-                color = "purple"
-                name = key.capitalize() + " Corrected"
-            else:
-                color = "green"
-                name = key.capitalize() + " Corrected"'''
-
-            print(name)
 
             upper_res = df[col_name].mean() + sig_range[1]*df[col_name].std()
             lower_res = df[col_name].mean() + sig_range[0]*df[col_name].std()
@@ -187,20 +163,20 @@ def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
             upper_eff = df[col_name].mean() + sig_range[1]*cl_helpers.effrms(df[col_name].to_frame().rename({0: col_name}))
             lower_eff = df[col_name].mean() + sig_range[0]*cl_helpers.effrms(df[col_name].to_frame().rename({0: col_name}))
 
-            #display_vals = df[ (df[col_name] > lower_eff) & (df[col_name] < upper_eff) ]
-            #display_vals = df[ df[col_name] > 0 ]
-            #display_vals = df[ df.gen_pt < 50 ]
-            display_vals = df
+            display_vals = df[ (df[col_name] > lower_eff) & (df[col_name] < upper_eff) ]
 
-            vals[name + " Total"] = {"Events": len(df[col_name]),
-                          "Mean": df[col_name].mean(),
-                          "Res": df[col_name].std()/df[col_name].mean(),
-                          "Eff Res": cl_helpers.effrms(df[col_name])/df[col_name].mean()}
+            mean_total_val = df[col_name].mean() if particle != "electrons" else cluster_data._get_gaus_mean(df, col_name)
+            mean_display_val = display_vals[col_name].mean() if particle != "electrons" else cluster_data._get_gaus_mean(display_vals, col_name)
+
+            vals[name + " Total"] = {"Events"                                    : len(df[col_name]),
+                                     "Mean" if particle!= "electrons" else "Peak": mean_total_val,
+                                     "Res"                                       : df[col_name].std()/mean_total_val,
+                                     "Eff Res"                                   : cl_helpers.effrms(df[col_name])/mean_total_val}
             
-            vals[name + " Displayed"] = {"Events": len(display_vals[col_name]),
-                                         "Mean": display_vals[col_name].mean(),
-                                         "Res": display_vals[col_name].std()/display_vals[col_name].mean(),
-                                         "Eff Res": cl_helpers.effrms(display_vals[col_name])/display_vals[col_name].mean()}
+            vals[name + " Displayed"] = {"Events"                                    : len(display_vals[col_name]),
+                                         "Mean" if particle!= "electrons" else "Peak": mean_display_val,
+                                         "Res"                                       : display_vals[col_name].std()/mean_display_val,
+                                         "Eff Res"                                   : cl_helpers.effrms(display_vals[col_name])/mean_display_val}
             
             x_title = r"$\frac{{p_T}^{Cl}}{{p_T}^{Gen}}$"
             y_title = r"$Events$"
@@ -217,7 +193,6 @@ def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
 
             fig.add_trace(go.Histogram(
                                 x = display_vals[col_name],
-                                #x = display_vals.gen_pt,
                                 nbinsx=1000 if particle != "pions" else 100,
                                 autobinx=False,
                                 name=name,
@@ -230,59 +205,19 @@ def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
 
             dist_args["traces"]["111"][name] = plot_info
 
-            if particle == "electrons":
-                ####################################################################################################
-                #peak = df[ (df[col_name] > lower_eff) & (df[col_name] < upper_eff) ]
-                peak = df[ df[col_name] > lower_eff ]
-                peak_vals = np.array(peak[col_name])
-                
-                bins = np.linspace(peak_vals.min(), peak_vals.max(), 100)
-                counts, bin_edges = np.histogram(peak_vals, bins=bins, density=True)
-                bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-
-                mean_0, sig_0 = bin_centers.mean(), bin_centers.std()
-                p0 = np.array([mean_0, sig_0])
-
-                lower_bounds = 0.01*p0
-                upper_bounds = 100*p0
-                bounds = Bounds(lower_bounds, upper_bounds)
-
-                params, _ = curve_fit(cl_plot_funcs.gaus, bin_centers, counts, p0=p0, bounds=bounds)
-                mean, sig = params
-                
-                pdf_values = cl_plot_funcs.gaus(bin_centers, mean, sig)
-
-                fig.add_trace(
-                    go.Scatter(
-                        x = bin_centers,
-                        y = pdf_values,
-                        line = dict(color=color),
-                        name = "Gauss Fit"
-                    )
-                )
                 ####################################################################################################
 
+    vline_key = "Mean" if particle != "electrons" else "Peak"
 
-    '''fig.add_vline(x=1.0, row=1, col=1, line_dash="dashdot", line_color="black")
-
-    fig.add_vline(x=vals["Original Displayed"]["Mean"], row=1, col=1, line_dash="dash", line_color="blue")
-    fig.add_vline(x=vals["Layer Weights Displayed"]["Mean"], row=1, col=1, line_dash="dash", line_color="red")
+    fig.add_vline(x=vals["Original Displayed"][vline_key], row=1, col=1, line_dash="dash", line_color="blue")
+    fig.add_vline(x=vals["Layer Weighted Displayed"][vline_key], row=1, col=1, line_dash="dash", line_color="red")
     
     if pileup_key=="PU200":
         if particle != "pions":
-            fig.add_vline(x=vals["Eta Correction Displayed"]["Mean"], row=1, col=1, line_dash="dash", line_color="green")
+            fig.add_vline(x=vals["Eta Corrected Displayed"][vline_key], row=1, col=1, line_dash="dash", line_color="green")
         else:
-            fig.add_vline(x=vals["Energy and Eta Correction Displayed"]["Mean"], row=1, col=1, line_dash="dash", line_color="green")'''
-
-    fig.add_vline(x=vals["Original Displayed"]["Mean"], row=1, col=1, line_dash="dash", line_color="blue")
-    fig.add_vline(x=vals["Layer Weighted Displayed"]["Mean"], row=1, col=1, line_dash="dash", line_color="red")
-    
-    if pileup_key=="PU200":
-        if particle != "pions":
-            fig.add_vline(x=vals["Eta Corrected Displayed"]["Mean"], row=1, col=1, line_dash="dash", line_color="green")
-        else:
-            fig.add_vline(x=vals["Energy Corrected Displayed"]["Mean"], row=1, col=1, line_dash="dash", line_color="green")
-            fig.add_vline(x=vals["Eta Corrected Displayed"]["Mean"], row=1, col=1, line_dash="dash", line_color="green")
+            fig.add_vline(x=vals["Energy Corrected Displayed"][vline_key], row=1, col=1, line_dash="dash", line_color="green")
+            fig.add_vline(x=vals["Eta Corrected Displayed"][vline_key], row=1, col=1, line_dash="dash", line_color="green")
 
     
     stat_df = pd.DataFrame(vals).reset_index()
@@ -379,23 +314,15 @@ def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
         elif particle == "pions":
             part_sym = "\pi"
 
-        #hist_title = r"${} \: $".format(part_sym) + r"${{p_T}^{Cl}}/{{p_T}^{Gen}} \: Distribution \: $" + r"$({})$".format(pileup_key)
-        #hist_path = "plots/png/pTNormDist_{}_eta_{}_{}_ptGtr_{}_log_{}_17juillet_bc_stc.png".format(pileup_key, cl_helpers.annot_str(eta_range[0]), cl_helpers.annot_str(eta_range[1]), pt_cut, particle)
-
-        #hist_title = r"${} \: $".format(part_sym) + r"${p_T}^{Gen} \: Distribution \: $" + r"$({})$".format(pileup_key)
-        #hist_path = "plots/png/pTGenDist_{}_eta_{}_{}_ptGtr_{}_log_{}_17juillet_bc_stc_18juillet.png".format(pileup_key, cl_helpers.annot_str(eta_range[0]), cl_helpers.annot_str(eta_range[1]), pt_cut, particle)
-
         hist_title = r"${} \: {} \: Distribution \: ({}, r={})$".format(part_sym, "{p_T}^{Norm}", pileup_key, coef)
-        hist_path = "plots/png/pTNormDist_{}_eta_{}_{}_ptGtr_{}_log_{}_bc_stc_radius{}_enEtaCalib_separate_byNorm.png".format(pileup_key, cl_helpers.annot_str(eta_range[0]), cl_helpers.annot_str(eta_range[1]), pt_cut, particle, str(coef).replace(".","p"))
+        hist_path = "plots/png/pTNormDist_{}_eta_{}_{}_ptGtr_{}_log_{}_bc_stc_radius{}_TEST.png".format(pileup_key, cl_helpers.annot_str(eta_range[0]), cl_helpers.annot_str(eta_range[1]), pt_cut, particle, str(coef).replace(".","p"))
 
         hist_cms = cl_plot_funcs.cmsPlot(hist_title, hist_path, **dist_args)
 
         hist_cms.write_fig()
 
-        #res_title = r"${} \: $".format(part_sym) + r"$Resolution \: vs. \: r^{Cl}$" + r"$({})$".format(pileup_key)
-        #res_title = r"{} Res vs. {}, ({}, {} GeV)".format(part_sym, "$r^{Cl}$", pileup_key, "${p_T}^{Gen} > 50$")
         res_title = r"${}$ Res vs. ".format(part_sym) + r"$r^{Cl}$, (" + r"{}, ".format(pileup_key) + r"${p_T}^{Gen} > 10 GeV)$"
-        res_path = "plots/png/res_vs_radius_{}_eta_{}_{}_ptGtr_{}_{}_bc_stc_enEtaCalib_separate_byNorm.png".format(pileup_key, cl_helpers.annot_str(eta_range[0]), cl_helpers.annot_str(eta_range[1]), pt_cut, particle)
+        res_path = "plots/png/res_vs_radius_{}_eta_{}_{}_ptGtr_{}_{}_bc_stc_TEST.png".format(pileup_key, cl_helpers.annot_str(eta_range[0]), cl_helpers.annot_str(eta_range[1]), pt_cut, particle)
 
         res_cms = cl_plot_funcs.cmsPlot(res_title, res_path, **res_args)
 

@@ -24,16 +24,6 @@ FLAGS = parser.parse_args()
 
 cluster_data = cl_helpers.clusterData()
 
-'''cfg = cl_helpers.read_cl_size_params()
-
-if cfg["local"]:
-    data_dir = cfg["localDir"]
-else:
-    data_dir = params.EOSStorage(FLAGS.user, cfg["dataFolder"])
-
-#input_files = cfg["dashApp"]
-input_files = cfg["dashApp"]["local"] if cfg["local"] else cfg["dashApp"]["EOS"]'''
-
 dash.register_page(__name__, title="PT", name="PT")
 
 layout = html.Div(
@@ -42,9 +32,9 @@ layout = html.Div(
         html.Br(),
         dcc.Tabs(
             id = "particle",
-            #value = "photons",
+            value = "photons",
             #value = "electrons",
-            value = "pions",
+            #value = "pions",
             children = [
                 dcc.Tab(label = "Photons", value = "photons"),
                 dcc.Tab(label = "Electrons", value = "electrons"),
@@ -88,10 +78,8 @@ def plot_norm(
     elif particle == "pions":
         part_sym = "$\pi$"
 
-    #plot_title = r"${} p_T$ Response".format(particle.capitalize()[:-1])
-    #plot_title = r"${} \: p_T$ Response \: (PU200, {}\: Gev)".format(part_sym, "${p_T}^{Gen} > 50 $")
     plot_title = r"{} Response (PU200, {} GeV)".format(part_sym, "${p_T}^{Gen} > 10$")
-    plot_path = "plots/png/pT_response_{}_eta_{}_{}_ptGtr_{}_{}_grid_enEtaCalib_byNorm_separate.png".format(pileup_key, str(eta_range[0]).replace(".","p"), str(eta_range[1]).replace(".","p"), str(pt_cut).replace(".","p"), particle)
+    plot_path = "plots/png/pT_response_{}_eta_{}_{}_ptGtr_{}_{}_TEST.png".format(pileup_key, str(eta_range[0]).replace(".","p"), str(eta_range[1]).replace(".","p"), str(pt_cut).replace(".","p"), particle)
     
     y_axis_title = r"$\huge{\langle \frac{{p_T}^{Cl}}{{p_T}^{Gen}} \rangle}$" if particle != "electrons" else r"$\huge{mode(\frac{{p_T}^{Cl}}{{p_T}^{Gen}})}$"
     x_axis_title = "Radius (Coeff)"
@@ -99,7 +87,6 @@ def plot_norm(
     plot_args = {"traces": {"111": {}}}
 
     for key in glob_pt_norm.keys():
-        #info= ["scatter", np.arange(0.0, 0.05, 0.001), glob_pt_norm[key], x_axis_title, y_axis_title, None]
         if key == "original":
             color = "blue"
         elif key == "layer" or key == "weighted":

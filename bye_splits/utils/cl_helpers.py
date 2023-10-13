@@ -17,24 +17,20 @@ import yaml
 
 from bye_splits.utils import common, params
 
-#import matplotlib.pyplot as plt
-#import mplhep as hep
+
 from scipy.optimize import curve_fit, Bounds
 
 annot_str = lambda x: str(x).replace(".", "p")
 
-def closest(list, k=0.0):
+def closest(coef_list, k=0.0):
     """Find the element of a list containing strings ['coef_{float_1}', 'coef_{float_2}', ...] which is closest to some float_i"""
-    try:
-        list = np.reshape(np.asarray(list), 1)
-    except ValueError:
-        list = np.asarray(list)
+    coef_list = np.asarray(coef_list)
     if isinstance(k, str):
         k_num = float(re.split("coef_", k)[1].replace("p", "."))
     else:
         k_num = k
-    id = (np.abs(list - k_num)).argmin()
-    return list[id]
+    id = (np.abs(coef_list - k_num)).argmin()
+    return coef_list[id]
 
 
 def get_str(coef, df_dict):
