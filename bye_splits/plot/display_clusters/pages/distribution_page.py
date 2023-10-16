@@ -157,13 +157,15 @@ def plot_dists(particle, coef, eta_range, sig_range, pt_cut, pileup, download):
                     color = "purple"
                     name = "Energy Corrected"
 
-            upper_res = df[col_name].mean() + sig_range[1]*df[col_name].std()
+            '''upper_res = df[col_name].mean() + sig_range[1]*df[col_name].std()
             lower_res = df[col_name].mean() + sig_range[0]*df[col_name].std()
             
             upper_eff = df[col_name].mean() + sig_range[1]*cl_helpers.effrms(df[col_name].to_frame().rename({0: col_name}))
             lower_eff = df[col_name].mean() + sig_range[0]*cl_helpers.effrms(df[col_name].to_frame().rename({0: col_name}))
 
-            display_vals = df[ (df[col_name] > lower_eff) & (df[col_name] < upper_eff) ]
+            display_vals = df[ (df[col_name] > lower_eff) & (df[col_name] < upper_eff) ]'''
+
+            display_vals = df
 
             mean_total_val = df[col_name].mean() if particle != "electrons" else cluster_data._get_gaus_mean(df, col_name)
             mean_display_val = display_vals[col_name].mean() if particle != "electrons" else cluster_data._get_gaus_mean(display_vals, col_name)

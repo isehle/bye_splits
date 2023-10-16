@@ -189,12 +189,14 @@ clusterStudies:
         photons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/photons/cluster/weighted/final/selectOnestd/maxSeed/fullEta/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
         electrons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/electrons/cluster/weighted/final/selectOnestd/maxSeed/fullEta/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
         #pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/weighted/final/bound5/selectOneStd/maxSeed/fullEta/posEta/bc_stc/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_bc_stc_ThresholdDummyHistomaxnoareath20_filtered_fullEta_enCalibrated.hdf5
-        pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/weighted/final/bound5/selectOneStd/maxSeed/fullEta/posEta/bc_stc/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_bc_stc_ThresholdDummyHistomaxnoareath20_filtered_fullEta_enCalibrated_byNorm.hdf5
+        #pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/weighted/final/bound5/selectOneStd/maxSeed/fullEta/posEta/bc_stc/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_bc_stc_ThresholdDummyHistomaxnoareath20_filtered_fullEta_enCalibrated_byNorm.hdf5
+        pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/pions/cluster/weighted/cluster_size_PU0_weighted_pions.hdf5
       PU200:
         photons: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/photons/cluster/weighted/selectOneStd/maxSeed/smooth/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
         electrons: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/electrons/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
         #pions: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_en_eta_calibrated.hdf5
-        pions: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_en_eta_calibrated_byNorm.hdf5
+        #pions: /grid_mnt/vol_home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/selectOneStd/maxSeed/smooth/bc_stc/posEta/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_en_eta_calibrated_byNorm.hdf5
+        pions: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU200/pions/cluster/weighted/cluster_size_PU200_weighted_pions.hdf5
     EOS:
       PU0:
         photons: /eos/user/i/iehle/data/PU0/photons/weighted/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_smooth_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
