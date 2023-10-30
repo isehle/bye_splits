@@ -90,175 +90,32 @@ def plot_norm(
     df_original, df_weighted = cl_helpers.get_dataframes(init_files, particle, coef, eta_range, pt_cut)
 
     fig = make_subplots(rows=1, cols=2, subplot_titles=("PT Norm Vs Gen Pt", "PT Norm Vs Gen Eta"))
-    vals, vals_eff = {}, {}
-    pt_plot_args = {"traces": {"111": {}}}
-    eta_plot_args = {"traces": {"111": {}}}
-    y_axis_title = r"$\sigma \: ({\sigma}_{eff})$"
-    for key, df in zip(("original", "weighted"), (df_original, df_weighted)):
-        upper_val = df['pt_norm'].mean() + 2*cl_helpers.effrms(df['pt_norm'].to_frame().rename({0: 'pt_norm'}))
-        lower_val = df['pt_norm'].mean() - 2*cl_helpers.effrms(df['pt_norm'].to_frame().rename({0: 'pt_norm'}))
 
-        #df = df[ (df['pt_norm'] > lower_val) & (df['pt_norm'] < upper_val) ]
+    dash_plot = cl_plot_funcs.dashPlot(particle, pileup_key)
+    dash_plot.plot_res(coef, df_original, df_weighted, "gen_pt", fig, (1,1))
+    dash_plot.plot_res(coef, df_original, df_weighted, "gen_eta", fig, (1,2))
 
-        bins = 20 if particle != "pions" else 5
-
-        df["gen_pt_bin"] = pd.cut(df.gen_pt, bins=bins, labels=False)
-        df["gen_eta_bin"] = pd.cut(df.gen_eta, bins=bins, labels=False)
-
-        if ((pileup_key == "PU200") & (key == "weighted")):
-            norm_cols = ["pt_norm", "pt_norm_eta_corr"]
-            sub_df  = df[["eta", "gen_eta", "gen_eta_bin", "pt", "gen_pt", "pt_norm", "pt_norm_eta_corr", "gen_pt_bin"]].reset_index()
-        else:
-            norm_cols = ["pt_norm"]
-            sub_df  = df[["eta", "gen_eta", "gen_eta_bin", "pt", "gen_pt", "pt_norm", "gen_pt_bin"]].reset_index()
-        
-        gen_pt = sub_df.groupby("gen_pt_bin").apply(lambda x: x.gen_pt.mean())
-        gen_eta = sub_df.groupby("gen_eta_bin").apply(lambda x: x.gen_eta.mean())
-
-        for col in norm_cols:
-            legend_name = "layer_corr" if key == "weighted" else ""
-            legend_name += "_eta_corr" if col == "pt_norm_eta_corr" else ""
-
-            if key == "original":
-                color = "blue"
-            else:
-                color = "red" if col == "pt_norm" else "green"
-
-            res_vs_gen_pt = sub_df.groupby("gen_pt_bin").apply(lambda x: x[col].std()/x[col].mean())
-            eff_res_vs_gen_pt = sub_df.groupby("gen_pt_bin").apply(lambda x: cl_helpers.effrms(x[col])/x[col].mean())
-
-            res_vs_gen_eta = sub_df.groupby("gen_eta_bin").apply(lambda x: x[col].std()/x[col].mean())
-            eff_res_vs_gen_eta = sub_df.groupby("gen_eta_bin").apply(lambda x: cl_helpers.effrms(x[col])/x[col].mean())
-
-            # Errors: CURRENTLY VERY LIKELY INCORRECT
-            '''gen_pt_err, rel_gen_pt_err = cl_helpers.rel_err(sub_df, "gen_pt", bin_col="gen_pt_bin")
-            gen_eta_err, _ = cl_helpers.rel_err(sub_df, "gen_eta", bin_col="gen_eta_bin")
-
-            _, rel_res_err_vs_gen_pt = cl_helpers.rel_err(res_vs_gen_pt)
-            _, rel_eff_res_err_vs_gen_pt = cl_helpers.rel_err(eff_res_vs_gen_pt)
-            _, rel_res_err_vs_gen_eta = cl_helpers.rel_err(res_vs_gen_eta)
-            _, rel_eff_res_err_vs_gen_eta = cl_helpers.rel_err(eff_res_vs_gen_eta)'''
-
-            pt_df = pd.DataFrame.from_dict({"gen_pt": gen_pt, "res": res_vs_gen_pt}) 
-            eta_df = pd.DataFrame.from_dict({"gen_eta": gen_eta, "res": res_vs_gen_eta})
-
-            pt_df_eff = pd.DataFrame.from_dict({"gen_pt": gen_pt, "res": eff_res_vs_gen_pt})
-            eta_df_eff = pd.DataFrame.from_dict({"gen_eta": gen_eta, "res": eff_res_vs_gen_eta})
-
-            means = {"pt": pt_df, "eta": eta_df}
-            means_eff = {"pt": pt_df_eff, "eta": eta_df_eff}
-
-            vals[key] = means
-            vals_eff[key] = means_eff
-
-            x_one_title = r"${p_T}^{Gen}$"
-
-            pt_plot_args["traces"]["111"][legend_name + " RMS/Mean"] = {"plot_type": "plot",
-                                                                        "x_data": vals[key]["pt"]["gen_pt"],
-                                                                        "y_data": vals[key]["pt"]["res"],
-                                                                        "x_title": x_one_title,
-                                                                        "y_title": y_axis_title,
-                                                                        "color": color,
-                                                                        "linestyle": "solid"}
-            
-            pt_plot_args["traces"]["111"][legend_name + " Eff_RMS/Mean"] = {"plot_type": "plot",
-                                                                            "x_data": vals_eff[key]["pt"]["gen_pt"],
-                                                                            "y_data": vals_eff[key]["pt"]["res"],
-                                                                            "x_title": x_one_title,
-                                                                            "y_title": y_axis_title,
-                                                                            "color": color,
-                                                                            "linestyle": "dashed"}
-
-            # PT Plot
-            fig.add_trace(
-                go.Scatter(
-                    x = vals[key]["pt"]["gen_pt"],
-                    y = vals[key]["pt"]["res"],
-                    name = legend_name + " RMS/Mean",
-                    line=dict(color=color),
-                    mode="lines",
-                ),
-                row=1,
-                col=1
-            )
-            fig.add_trace(
-                go.Scatter(
-                    x = vals_eff[key]["pt"]["gen_pt"],
-                    y = vals_eff[key]["pt"]["res"],
-                    name = legend_name + " Eff_RMS/Mean",
-                    line=dict(dash="dash", color=color),
-                    mode="lines",
-                ),
-                row=1,
-                col=1
-            )
-
-            x_two_title = r"$|{\eta}^{Gen}|$"
-
-            eta_plot_args["traces"]["111"][legend_name + " RMS/Mean"] = {"plot_type": "plot",
-                                                                        "x_data": vals[key]["eta"]["gen_eta"],
-                                                                        "y_data": vals[key]["eta"]["res"],
-                                                                        "x_title": x_two_title,
-                                                                        "y_title": y_axis_title,
-                                                                        "color" : color,
-                                                                        "linestyle": "solid"}
-            
-            eta_plot_args["traces"]["111"][legend_name + " Eff_RMS/Mean"] = {"plot_type": "plot",
-                                                                            "x_data": vals_eff[key]["eta"]["gen_eta"],
-                                                                            "y_data": vals_eff[key]["eta"]["res"],
-                                                                            "x_title": x_two_title,
-                                                                            "y_title": y_axis_title,
-                                                                            "color" : color,
-                                                                            "linestyle": "dashed"}
-
-            # Eta Plot
-            fig.add_trace(
-                go.Scatter(
-                    x = vals[key]["eta"]["gen_eta"],
-                    y = vals[key]["eta"]["res"],
-                    name = legend_name + " RMS/Mean",
-                    line=dict(color=color),
-                    mode="lines",
-                ),
-                row=1,
-                col=2
-            )
-
-            fig.add_trace(
-                go.Scatter(
-                    x = vals_eff[key]["eta"]["gen_eta"],
-                    y = vals_eff[key]["eta"]["res"],
-                    name = legend_name + " Eff_RMS/Mean",
-                    line = dict(dash="dash", color=color),
-                    mode="lines",
-                ),
-                row=1,
-                col=2
-            )
-
-        fig.update_xaxes(title_text=r"$\huge{{p_T}^{Gen}}$",
-                         row=1,
-                         col=1,
-                         minor=dict(showgrid=True, dtick=20))
-        fig.update_xaxes(title_text=r"$\huge{|\eta^{Gen}|}$",
-                         row=1,
-                         col=2,
-                         minor=dict(showgrid=True, dtick=0.1))
-        fig.update_yaxes(row=1,
-                         col=1,
-                         minor=dict(showgrid=True, dtick=0.01))
-        fig.update_yaxes(row=1,
-                         col=2,
-                         minor=dict(showgrid=True, dtick=0.01))
-        #fig.update_yaxes(type="log", row=1, col=1)
-        #fig.update_yaxes(type="log", row=1, col=2)
+    fig.update_xaxes(title_text=r"$\huge{{p_T}^{Gen}}$",
+                        row=1,
+                        col=1,
+                        minor=dict(showgrid=True, dtick=20))
+    fig.update_xaxes(title_text=r"$\huge{|\eta^{Gen}|}$",
+                        row=1,
+                        col=2,
+                        minor=dict(showgrid=True, dtick=0.1))
+    fig.update_yaxes(row=1,
+                        col=1,
+                        minor=dict(showgrid=True, dtick=0.01))
+    fig.update_yaxes(row=1,
+                        col=2,
+                        minor=dict(showgrid=True, dtick=0.01))
 
     y_axis_title = r"$\huge{Res}$"
     fig.update_layout(
         yaxis_title_text=y_axis_title,
     )
 
-    pt_text = r"${p_T}^{Gen} > $" + r"${}$".format(pt_cut)
+    """pt_text = r"${p_T}^{Gen} > $" + r"${}$".format(pt_cut)
     eta_text = r"${} < \eta < {}$".format(eta_range[0], eta_range[1])
 
     '''pt_plot_args["eta_text"] = eta_text
@@ -288,7 +145,7 @@ def plot_norm(
 
     if download > 0:
         pt_cms_plot.write_fig()
-        eta_cms_plot.write_fig()
+        eta_cms_plot.write_fig()"""
 
     return fig
 

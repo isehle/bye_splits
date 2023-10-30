@@ -206,6 +206,18 @@ clusterStudies:
         photons: /eos/user/i/iehle/data/PU200/photons/weighted/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
         electrons: /eos/user/i/iehle/data/PU200/electrons/weighted/cluster_size_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_fullEta.hdf5
         pions: /eos/user/i/iehle/data/PU200/pions/weighted/cluster_size_fullEta_weighted_selectOneEffRms_maxSeed_ThresholdDummyHistomaxnoareath20_filtered_lessCols.hdf5
+    plot:
+      dist:
+      pt:
+        template_name: pT_response_PARTICLE_eta_ETA1_ETA2_ptGtr_PT
+        traces: None
+        hline:
+          val: 1.0
+          color: black
+          linestyle: --
+      res:
+      response:
+      weights:
   optimization:
     PU0:
       photons: /home/llr/cms/ehle/NewRepos/bye_splits/data/new_algos/PU0/photons/cluster/photons_PU0_cluster_size_ThresholdDummyHistomaxnoareath20.hdf5

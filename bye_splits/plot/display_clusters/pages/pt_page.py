@@ -33,8 +33,6 @@ layout = html.Div(
         dcc.Tabs(
             id = "particle",
             value = "photons",
-            #value = "electrons",
-            #value = "pions",
             children = [
                 dcc.Tab(label = "Photons", value = "photons"),
                 dcc.Tab(label = "Electrons", value = "electrons"),
@@ -43,7 +41,8 @@ layout = html.Div(
         ),
         html.Div([dbc.Button("Pile Up", id="pileup", color="primary", n_clicks=1),
                   dcc.Input(id="pt_cut", value=10.0),
-                  dbc.Button("Download Figure", id="download", color="primary", n_clicks=0)]),
+                  dbc.Button("Download Figure", id="download", color="primary", n_clicks=0),
+                  dbc.Button("Particle/Calibration View", id="tab_switch", color="primary", n_clicks=0)]),
         dcc.Graph(id="cl-pt-graph", mathjax=True),
         html.P("EtaRange:"),
         dcc.RangeSlider(id="eta_range", min=1.7, max=2.7, step=0.1, value=[1.7, 2.7]),
@@ -51,74 +50,65 @@ layout = html.Div(
 )
 
 @callback(
+    Output("particle", "children"),
+    Output("particle", "value"),
+    Input("particle", "value"),
+    Input("tab_switch", "n_clicks"),
+    Input("pileup", "n_clicks")
+)
+def switch_type(particle, tab_switch, pileup):
+    if tab_switch % 2 == 0:
+        return (
+            [dcc.Tab(label = "Photons", value = "photons"),
+             dcc.Tab(label = "Electrons", value = "electrons"),
+             dcc.Tab(label = "Pions", value = "pions")],
+             particle
+        )
+    else:
+        return (
+            [dcc.Tab(label = "Original", value = "original"),
+             dcc.Tab(label = "Layer", value = "layer"),
+             dcc.Tab(label = "Eta", value = "eta")],
+             "layer" if pileup%2==0 else "eta"
+        )
+
+
+@callback(
     Output("cl-pt-graph", "figure"),
     Input("eta_range", "value"),
     Input("pt_cut", "value"),
     Input("pileup", "n_clicks"),
+    Input("tab_switch", "n_clicks"),
     Input("particle", "value"),
     Input("download", "n_clicks")
 )
 def plot_norm(
-    eta_range, pt_cut, pileup, particle, download
+    eta_range, pt_cut, pileup, tab_switch, particle, download
 ):
     # even number of clicks --> PU0, odd --> PU200 (will reset with other callbacks otherwise)
     pileup_key = "PU0" if pileup%2==0 else "PU200"
 
-    if particle != "electrons":
-        glob_pt_norm = cluster_data.get_global_pt(particle, eta_range, pt_cut, pileup_key)
-    else:
-        glob_pt_norm = cluster_data.get_global_pt(particle, eta_range, pt_cut, pileup_key, "peak")
-
     fig = go.Figure()
+    dash_plot = cl_plot_funcs.dashPlot(particle, pileup_key)
 
-    if particle == "photons":
-        part_sym = "$\gamma$"
-    elif particle == "electrons":
-        part_sym = "$e$"
-    elif particle == "pions":
-        part_sym = "$\pi$"
+    if tab_switch % 2 == 0:
+        if particle != "electrons":
+            glob_pt_norm = cluster_data.get_global_pt(particle, eta_range, pt_cut, pileup_key)
+        else:
+            glob_pt_norm = cluster_data.get_global_pt(particle, eta_range, pt_cut, pileup_key, "peak")
+        
+        fig = dash_plot.plot_global_pt(glob_pt_norm, fig)
+    else:
+        glob_pt_norm = {
+            "photons"  : cluster_data.get_global_pt("photons", eta_range, pt_cut, pileup_key),
+            "electrons": cluster_data.get_global_pt("electrons", eta_range, pt_cut, pileup_key, "peak"),
+            "pions"    : cluster_data.get_global_pt("pions", eta_range, pt_cut, pileup_key)
+        }
 
-    plot_title = r"{} Response (PU200, {} GeV)".format(part_sym, "${p_T}^{Gen} > 10$")
-    plot_path = "plots/png/pT_response_{}_eta_{}_{}_ptGtr_{}_{}_TEST.png".format(pileup_key, str(eta_range[0]).replace(".","p"), str(eta_range[1]).replace(".","p"), str(pt_cut).replace(".","p"), particle)
-    
+        fig = dash_plot.plot_global_pt(glob_pt_norm, fig, version="calib", calib=particle)
+
     y_axis_title = r"$\huge{\langle \frac{{p_T}^{Cl}}{{p_T}^{Gen}} \rangle}$" if particle != "electrons" else r"$\huge{mode(\frac{{p_T}^{Cl}}{{p_T}^{Gen}})}$"
     x_axis_title = "Radius (Coeff)"
-
-    plot_args = {"traces": {"111": {}}}
-
-    for key in glob_pt_norm.keys():
-        if key == "original":
-            color = "blue"
-        elif key == "layer" or key == "weighted":
-            color = "red"
-        elif key == "energy":
-            color = "purple"
-        else:
-            color = "green"
-
-        info = {"plot_type": "plot",
-                            "x_data": np.arange(0.001, 0.05, 0.001),
-                            "y_data": glob_pt_norm[key],
-                            "x_title": x_axis_title,
-                            "y_title": y_axis_title,
-                            "color": color,
-                            "linestyle": "solid"}
-        
-        plot_args["traces"]["111"][key] = info
-
-        fig.add_trace(
-            go.Scatter(
-                x = np.arange(0.0, 0.05, 0.001),
-                y = glob_pt_norm[key],
-                name = key.capitalize()
-            )
-        )
-
-    plot_args["hline"] = {"val": 1.0, "color": "black", "linestyle": "--"}
-    
-    cms_plot = cl_plot_funcs.cmsPlot(plot_title, plot_path, **plot_args)
-
-    fig.add_hline(y=1.0, line_dash="dash", line_color="green")
     
     fig.update_xaxes(title_text=x_axis_title, minor=dict(showgrid=True, dtick=0.001))
 
@@ -129,7 +119,19 @@ def plot_norm(
     fig.update_yaxes(title_text=y_axis_title, minor=dict(showgrid=True, dtick=0.05))
 
     if download > 0:
-        cms_plot.write_fig()
+        symbols = {"photons": "\gamma",
+                   "electrons": "e",
+                   "pions"    : "\pi",
+                   "original" : "Original",
+                   "layer"    : "Layer \; Weighted",
+                   "eta"      : "|\eta| \; Calibrated"}
+
+        symbol = symbols[particle]
+
+        plot_title = r"${} \;".format(symbol) + r"p_T \; Response \; vs. \; r^{Cl}$"
+
+        plot_path  = os.path.join(parent_dir, "plots/png/pT_response_vs_radius_{}_eta_{}_{}_ptGtr_{}_{}_calibration.png".format(pileup_key, eta_range[0], eta_range[1], pt_cut, particle))
+        dash_plot.download_plot(plot_title, plot_path)
 
     return fig
 

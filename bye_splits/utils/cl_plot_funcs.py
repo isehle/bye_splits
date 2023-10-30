@@ -8,6 +8,8 @@ parent_dir = os.path.abspath(__file__ + 3 * "/..")
 sys.path.insert(0, parent_dir)
 
 import numpy as np
+import pandas as pd
+
 from scipy.stats import crystalball
 from scipy.special import erf
 import scipy.special as sp
@@ -16,6 +18,7 @@ import matplotlib.pyplot as plt
 import mplhep as hep
 
 from dash import callback, Input, Output, State, callback_context
+import plotly.graph_objects as go
 
 from bye_splits.utils import cl_helpers
 
@@ -29,6 +32,217 @@ title = lambda tit, pu: tit + r"$({})$".format(pu)
 path = lambda base, pu, eta, pt, particle: base.format(pu, cl_helpers.annot_str(eta[0]), cl_helpers.annot_str(eta[1]), pt, particle)
 
 
+class dashPlot:
+    def __init__(self, particle, pileup, **kwargs):
+        self.particle     = particle
+        self.pileup       = pileup
+        self.kwargs       = kwargs
+        self.cluster_data = cl_helpers.clusterData()
+        self.plot_data    = dict.fromkeys(("plot_type", "hline", "vline", "traces"), None)
+
+    def _set_props(self):
+
+        labels = ["Original", "Layer Weighted"]
+        colors = ["blue", "red"]
+        cols   = ["pt_norm", "pt_norm"]
+
+        if self.particle == "pions":
+            labels.append("Energy Corrected")
+            colors.append("purple")
+            cols.append("pt_norm_en_corrected")
+        
+        if self.pileup == "PU200":
+            labels.append("Eta Corrected")
+            colors.append("green")
+            cols.append("pt_norm_eta_corr") if self.particle != "pions" else cols.append("pt_norm_eta_corrected")
+
+        return labels, colors, cols
+
+    def plot_hist(self, radius, df_o, df_w, fig, rowcol=(1,1), version="particle", calib = None):
+        labels, colors, cols = self._set_props()
+
+        self.plot_data["plot_type"] = "hist"
+
+        if version == "particle":
+            for label, color, column in zip(labels, colors, cols):
+                df = df_o if label == "Original" else df_w
+
+                mean_value = df[column].mean() if self.particle != "electrons" else self.cluster_data._get_gaus_mean(df, column)
+
+                fig.add_trace(
+                    go.Histogram(
+                        x = df[column],
+                        nbinsx=1000 if self.particle != "pions" else 100,
+                        autobinx=False,
+                        name=label,
+                        histnorm="probability density",
+                        marker_color=color
+                    ),
+                    row=rowcol[0],
+                    col=rowcol[1]
+                )
+                
+                fig.add_vline(x=mean_value, row=rowcol[0], col=rowcol[1], line_dash="dash", line_color=color)
+        else:
+            column_matching = {"original": "pt_norm",
+                               "layer"   : "pt_norm",
+                               "eta"     : "pt_norm_eta_corr"}
+            
+            
+            df_type = df_o if calib == "original" else df_w
+
+            for particle,color in zip(df_o.keys(), ("blue", "red", "green")):
+                if particle == "pions":
+                    column_matching["eta"] = "pt_norm_eta_corrected"
+                
+                column = column_matching[calib]
+                df = df_type[particle]
+
+                mean_value = df[column].mean() if particle != "electrons" else self.cluster_data._get_gaus_mean(df, column)
+
+                fig.add_trace(
+                    go.Histogram(
+                        x = df[column],
+                        nbinsx=1000 if self.particle != "pions" else 100,
+                        autobinx=False,
+                        name=particle.capitalize(),
+                        histnorm="probability density",
+                        marker_color=color
+                    ),
+                    row=rowcol[0],
+                    col=rowcol[1]
+                )
+
+                fig.add_vline(x=mean_value, row=rowcol[0], col=rowcol[1], line_dash="dash", line_color=color)
+
+        return fig
+
+    def plot_res(self, radius, df_o, df_w, x_axis, fig, rowcol, version):
+        labels, colors, cols = self._set_props()
+
+        self.plot_data["plot_type"] = "scatter"
+
+        for label, color, column in zip(labels, colors, cols):
+            df = df_o if label == "Original" else df_w
+
+            df[x_axis + "_bin"] = pd.cut(df[x_axis], bins=20, labels=False)
+
+            x_data = df.groupby(x_axis + "_bin").apply(lambda x: x[x_axis].mean())
+            res    = df.groupby(x_axis + "_bin").apply(lambda x: x[column].std()/x[column].mean())
+            eff    = df.groupby(x_axis + "_bin").apply(lambda x: cl_helpers.effrms(x[column])/x[column].mean())
+
+            for i, y_data in enumerate([res, eff]):
+                fig.add_trace(
+                    go.Scatter(
+                        x = x_data,
+                        y = y_data,
+                        name = label + " RMS/Mean" if i==0 else label + " Eff_RMS/Mean",
+                        line = dict(color=color) if i==0 else dict(dash="dash", color=color),
+                        mode="lines"
+                    ),
+                    row=rowcol[0],
+                    col=rowcol[1]
+                )
+        
+        return fig
+
+    def plot_global_res(self, glob_res, fig, rowcol):
+        labels, colors, cols = self._set_props()
+
+        self.plot_data["plot_type"] = "plot"
+
+        label_matching = {"Original"        : "original",
+                          "Layer Weighted"  : "layer",
+                          "Energy Corrected": "energy",
+                          "Eta Corrected"   : "eta"}
+
+        for label, color, column in zip(labels, colors, cols):
+            res_key = label_matching[label]
+
+            for i, res in enumerate(glob_res[res_key].values()):
+                fig.add_trace(
+                    go.Scatter(
+                        x = np.arange(0.001, 0.05, 0.001),
+                        y = res,
+                        name = label + " RMS" if i==0 else label + " Eff_RMS",
+                        line = dict(color=color) if i==0 else dict(dash="dash", color=color)
+                    ),
+                    row=rowcol[0],
+                    col=rowcol[1]
+                )
+
+        return fig
+
+    def plot_global_pt(self, glob_pt, fig, version="particle", calib=None):
+        fig.add_hline(y = 1.0, line_dash="dash", line_color="black")
+
+        #self.plot_data["plot_type"] = "plot"
+        self.plot_data["hline"]     = {"val": 1.0, "color": "black", "linestyle": "--"}
+        self.plot_data["x_title"]   = r"$r^{Cl}$"
+        self.plot_data["y_title"]   = r"$\langle p_T^{Cl}/{p_T^{Gen}} \rangle$"
+        self.plot_data["traces"]    = {}
+
+        if version=="particle":
+            labels, colors, cols = self._set_props()
+
+            label_matching = {"Original"        : "original",
+                            "Layer Weighted"  : "weighted",
+                            "Energy Corrected": "energy",
+                            "Eta Corrected"   : "eta"}
+
+            for label, color, column in zip(labels, colors, cols):
+                pt_key = label_matching[label]
+            
+                trace_data = {"plot_type": "plot",
+                            "color"    : color,
+                            "x_data"   : np.arange(0.001, 0.05, 0.001),
+                            "y_data"   : glob_pt[pt_key],
+                            "linestyle": "-",
+                            }
+
+                self.plot_data["traces"].update({label: trace_data})
+
+                fig.add_trace(
+                    go.Scatter(
+                        x = np.arange(0.001, 0.05, 0.001),
+                        y = glob_pt[pt_key],
+                        name = label,
+                    )
+                )
+        else:
+            label_matching = {"original": "original",
+                              "layer"   : "weighted",
+                              "eta"     : "eta"}
+
+            for particle, data in glob_pt.items():
+                key = label_matching[calib]
+                
+                if particle == "photons":
+                    color = "blue"
+                else:
+                    color = "red" if particle == "electrons" else "green"
+
+                trace_data = {"plot_type": "plot",
+                              "color"    : color,
+                              "x_data"   : np.arange(0.001, 0.05, 0.001),
+                              "y_data"   : data[key],
+                              "linestyle": "-"} 
+
+                self.plot_data["traces"].update({particle: trace_data})               
+
+                fig.add_trace(
+                    go.Scatter(
+                        x = np.arange(0.001, 0.05, 0.001),
+                        y = data[key],
+                        name = particle.capitalize(),
+                    )
+                )
+
+        return fig
+            
+    def download_plot(self, plot_title, plot_path):
+        cmsPlot(plot_title, plot_path, **self.plot_data).write_fig()
+
 class cmsPlot:
     def __init__(self, plot_title, plot_path, **kwargs):
         self.kwargs = kwargs
@@ -36,9 +250,16 @@ class cmsPlot:
         self.plot_path = plot_path
         hep.style.use("CMS")
         plt.rcParams['text.usetex'] = True
-        self.fig = plt.figure()
+
+    def _plot_hist(self, info, label):
+        counts, bins = np.histogram(info["data"], bins=info["bins"])
+        plt.stairs(counts, bins, label=label, color = info["color"])
+
+        mean_val, color, linestyle = info["vline"].values()
+        ax.axvline(x=mean_val, color=color, linestyle=linestyle)
 
     def write_fig(self):
+        fig, ax = plt.subplots()
         traces = self.kwargs["traces"]
 
         if "yrange" in self.kwargs.keys():
@@ -48,78 +269,42 @@ class cmsPlot:
             x_min, x_max = self.kwargs["xrange"]
             plt.xlim(x_min, x_max)
 
-        if "hline" in self.kwargs.keys():
+        if self.kwargs["hline"] is not None:
             val, col, style = self.kwargs["hline"].values()
-        if "vline" in self.kwargs.keys():
+            ax.axline((0, val), slope=0, color=col, linestyle=style)
+        if self.kwargs["vline"] is not None:
             val, col, style = self.kwargs["vline"].values()
+
+        particle_legend = {"photons"  : r"$\gamma$",
+                            "electrons": r"$e$",
+                            "pions"    : r"$\pi$"}
         
-        for key in traces.keys():
+        for label, info in traces.items():
 
-            n_rows, n_cols, fig_num = tup(key)
-            ax = self.fig.add_subplot(n_rows, n_cols, fig_num)
+            if label in particle_legend.keys(): label = particle_legend[label]
 
-            if "hline" in self.kwargs.keys():
-                ax.axhline(y=val, color=col, linestyle=style)
-            if "vline" in self.kwargs.keys():
-                ax.axvline(x=val, color=col, linestyle=style)
-                
-            #max_x, max_y = [], []
-            for label, info in traces[key].items():
-                print("\n", label)
-                if info["plot_type"] == "scatter":
-                    #max_x.append(max(info["x_data"])), max_y.append(max(info["y_data"]))
-                    ax.scatter(info["x_data"], info["y_data"], label = label, c = info["color"])
+            if info["plot_type"] == "scatter":
+                ax.scatter(info["x_data"], info["y_data"], label = label, c = info["color"])
 
-                    if (("xerr" in info.keys()) and ("yerr" in info.keys())):
-                        plt.errorbar(info["x_data"], info["y_data"], yerr=info["yerr"], xerr=info["xerr"], ecolor = info["color"])
-                    elif "xerr" in info.keys():
-                        plt.errorbar(info["x_data"], info["y_data"], xerr=info["xerr"], ecolor = info["color"])
-                    elif "yerr" in info.keys():
-                        plt.errorbar(info["x_data"], info["y_data"], yerr=info["yerr"], ecolor = info["color"])
+            elif info["plot_type"] == "plot":
+                ax.plot(info["x_data"], info["y_data"], label = label, color = info["color"], linestyle=info["linestyle"])
 
-                elif info["plot_type"] == "plot":
-                    #max_x.append(max(info["x_data"])), max_y.append(max(info["y_data"]))
-                    ax.plot(info["x_data"], info["y_data"], label = label, color = info["color"], linestyle=info["linestyle"])
-                    
-                    if (("xerr" in info.keys()) and ("yerr" in info.keys())):
-                        plt.errorbar(info["x_data"], info["y_data"], yerr=info["yerr"], xerr=info["xerr"], ecolor = info["color"])
-                    elif "xerr" in info.keys():
-                        plt.errorbar(info["x_data"], info["y_data"], xerr=info["xerr"], ecolor = info["color"])
-                    elif "yerr" in info.keys():
-                        plt.errorbar(info["x_data"], info["y_data"], yerr=info["yerr"], ecolor = info["color"])
-                    
-                    if "yscale" in info.keys():
-                        plt.yscale(info["yscale"])
-
-                elif info["plot_type"] == "hist":
-                    counts, bins = np.histogram(info["data"], bins=info["bins"])
-                    #max_x.append(max(bins)), max_y.append(max(counts))
-                    plt.stairs(counts, bins, label=label, color = info["color"])
-                    plt.yscale("log")
-
-                    mean_val, color, linestyle = info["vline"].values()
-                    ax.axvline(x=mean_val, color=color, linestyle=linestyle)
-                
-                elif info["plot_type"] == "violin":
-                    ax.violin(info["data"], positions=info["layers"], showmeans=True, showmedians=True)
-                
-                ax.set_xlabel(info["x_title"]), ax.set_ylabel(info["y_title"])
-
-            legend = ax.legend()
-
-            if "pt_text" in self.kwargs.keys():
-                plt.figtext(0.2, 0.65, self.kwargs["radius_text"])
-                plt.figtext(0.2, 0.6, self.kwargs["pt_text"])
-                plt.figtext(0.2, 0.55, self.kwargs["eta_text"])
-                print(self.kwargs["radius_text"])
-
-
-            ax.grid(visible=True, which="both")
-
-            ax.set_title(self.plot_title, loc="left")
+            elif info["plot_type"] == "hist":
+                self._plot_hist(info, label)
+            
+            if "yscale" in info.keys():
+                plt.yscale(info["yscale"])
         
-        print(self.plot_path)
-        self.fig.savefig(self.plot_path)
+        ax.set_xlabel(self.kwargs["x_title"]), ax.set_ylabel(self.kwargs["y_title"])
+
+        legend = ax.legend()
+
+        ax.grid(visible=True, which="both")
+
+        ax.set_title(self.plot_title, loc="left")
+        
+        print("\nWriting: ", self.plot_path)
+        fig.savefig(self.plot_path)
 
 def gaus(x, mean, std):
     return pow(std*np.sqrt(2*np.pi), -1)*np.exp(-pow((x-mean)/std,2)/2)
@@ -151,45 +336,6 @@ def crystal_ball(data, alpha, n, mean, std):
     tail = N*pLaw(data, mean, std, n, A, B)
 
     return np.where(cond, peak, tail)
-
-'''def ApproxErf(arg):
-    erflim = 5.0
-    if arg > erflim:
-        return 1.0
-    if arg < -erflim:
-        return -1.0
-
-    return sp.erf(arg)
-
-def CB(x, mean=1, sigma=1, alpha=1, n=1, norm=1):
-    pi = np.pi
-    sqrt2 = np.sqrt(2)
-    sqrtPiOver2 = np.sqrt(np.pi / 2)
-
-    # Variable std deviation
-    sig = abs(sigma)
-    t = (x - mean)/sig
-    if alpha < 0:
-        t = -t
-
-    # Crystal Ball part
-    absAlpha = abs(alpha)
-    A = pow(n / absAlpha, n) * np.exp(-0.5 * absAlpha * absAlpha)
-    B = absAlpha - n / absAlpha
-    C = n / absAlpha * np.exp(-0.5*absAlpha*absAlpha) / (n - 1)
-    D = (1 + ApproxErf(absAlpha / sqrt2)) * sqrtPiOver2
-    N = norm / (D + C)
-
-    if t <= absAlpha:
-        crystalBall = N * (1 + ApproxErf( t / sqrt2 )) * sqrtPiOver2
-    else:
-        print("\nx: ", x)
-        print("\nt: ", t)
-        crystalBall = N * (D +  A * (1/pow(t-B,n-1) - 1/pow(absAlpha - B,n-1)) / (1 - n))
-
-    return crystalBall
-
-vectCB = np.vectorize(CB)'''
 
 def update_particle_callback():
     @callback(
